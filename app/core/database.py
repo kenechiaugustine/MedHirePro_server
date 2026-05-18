@@ -32,7 +32,11 @@ async def init_indexes():
 async def connect_to_mongo():
     db.client = AsyncIOMotorClient(settings.MONGODB_URL)
     print("Connected to MongoDB")
-    await init_indexes()
+    try:
+        await init_indexes()
+    except Exception as e:
+        print(f"WARNING: Failed to initialize indexes on startup: {e}")
+        print("The application will continue — indexes will be created when the database becomes available.")
 
 async def close_mongo_connection():
     if db.client is not None:
