@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # FastAPI Backend Service
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: medhirepro-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+    env_file:
+      - .env
+    volumes:
+      # Mount source code for hot-reload in development
+      - ./app:/app/app
+      - ./requirements.txt:/app/requirements.txt
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    command: sh -c "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --reload"
+    restart: unless-stopped
+    networks:
+      - medhirepro-network
+
+  # MongoDB Database Service
+  mongodb:
+    image: mongo:7.0
+    container_name: medhirepro-mongodb
+    ports:
+      - "27018:27017"  # Map to 27018 to avoid conflict with local MongoDB
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=medhirepro_db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - medhirepro-network
+
+# Persistent volumes
+volumes:
+  mongodb_data:
+    driver: local
+
+# Network
+networks:
+  medhirepro-network:
+    driver: bridge
