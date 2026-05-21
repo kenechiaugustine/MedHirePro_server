@@ -84,15 +84,6 @@ docker-compose up --build
 
 ---
 
-## 🛡️ Anti-Abuse Rolling Window Earning Logic
-
-To prevent malicious activities, the credits mechanism relies on rolling window algorithms calculated based on UTC day structures:
-1. **Daily Limits**: Earning via the daily source validates that the sum of credits earned within the current UTC day does not cross the user's daily credit cap. If the cap is breached, the system returns a rate-limit error.
-2. **Socials Reward Cap**: Social credit claims are audited. The system checks if any transaction under socials exists within the current day window. If so, subsequent claims are blocked.
-3. **Double-Spend Prevention**: Decrementing balances runs via atomic MongoDB check-and-update statements to prevent race conditions or double-spending.
-
----
-
 ## 📜 License
 
 Distributed under the **MIT License**. See `LICENSE` for more information (if applicable).
