@@ -6,23 +6,33 @@
 [![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED.svg)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Welcome to the backend repository of **MedHirePro**—a robust, modern staffing and hiring web application tailored specifically for the healthcare industry. Built on a cutting-edge asynchronous stack featuring **FastAPI**, **MongoDB (via Motor)**, and containerized with **Docker**, this API serves as the powerful engine driving seamless interactions between medical professionals and healthcare institutes.
+Welcome to the backend engine of **MedHirePro**—a robust, high-performance staffing and hiring platform tailored specifically for the healthcare sector. Built on a state-of-the-art asynchronous architecture, this API leverages **FastAPI**, **MongoDB (via Motor driver)**, and **Docker** to provide a secure, fast, and scalable service layer that connects medical professionals with healthcare institutes.
 
 ---
 
-## 🚀 Key Highlights & Architecture
+## 📌 Table of Contents
 
-- **Lightning-Fast Async Stack**: Engineered fully with Python's asynchronous features using `AsyncIO` and `Motor` to handle high concurrent loads.
-- **Dual-Role Onboarding**: Tailored sign-up flows for **Medical Professionals** and **Healthcare Institutes**.
-- **Secure JWT Session Flow**: State-of-the-art authentication using secure JWT Access and Refresh Tokens, plus secure password hashing via `passlib[bcrypt]`.
-- **Google OAuth Integration**: Direct, server-side verified registration and single-sign-on using Google OAuth credentials.
-- **Robust Transactional Credits System**: 
-  - Dual welcome bonuses of credits upon registration.
-  - Rolling 24-hour daily earning limits to prevent bot exploitation.
-  - One-time-per-24h social claim verification.
-  - Atomic transactions using MongoDB updates to guarantee balance consistency under race conditions.
-- **Soft Account Deletion**: Strict privacy compliance. Soft deleting an account clears the user's credit transactions history while maintaining database integrity.
-- **Auto-Configured DB Performance**: Collections index initialization executed automatically on system startup to guarantee high-performance query operations.
+- [🚀 Key Architecture & Highlights](#-key-architecture--highlights)
+- [🛠️ Technology Stack](#️-technology-stack)
+- [💻 Local Development Setup](#-local-development-setup)
+  - [Option 1: Manual Virtualenv Run](#option-1-manual-virtualenv-run)
+  - [Option 2: Docker Compose (Recommended)](#option-2-docker-compose-recommended)
+- [📜 License](#-license)
+
+---
+
+## 🚀 Key Architecture & Highlights
+
+- **⚡ Lightning-Fast Asynchronous Processing**: Built entirely around Python's `async/await` paradigm, utilizing `AsyncIO` and `Motor` to handle heavy parallel traffic without blocking the event loop.
+- **👥 Flexible Dual-Role Onboarding**: Tailored sign-up paths and business logic constraints for both **Medical Professionals** and **Healthcare Institutes**.
+- **🛡️ Premium Security & Sessions**: State-of-the-art JWT architecture featuring access and refresh token pairings with secure client authentication under FastAPI's `HTTPBearer` scheme. Secure password hashing is implemented using `passlib[bcrypt]`.
+- **🌐 Seamless Google OAuth SSO**: Server-side verified single sign-on (SSO) and registration using Google Client tokens. Automatically registers new OAuth profiles while preventing duplication.
+- **💰 Transactional Credits System (Ledger Model)**:
+  - **Welcome Bonus**: Awards a default sign-up bonus of **2 credits** to new users.
+  - **Daily & Social Caps**: Rolling 24-hour daily limits (default **20 credits** limit for `daily` tasks, **1 claim** per 24 hours for `socials` tasks) to block bot abuse.
+  - **Atomic Integrity**: Credits spending is done atomically in MongoDB (`$gte` balance checks paired with `$inc` operations) to prevent race conditions or double-spending vulnerabilities.
+- **🧹 Compliance-Ready Soft Deletion**: Provides secure soft-deletion workflows (`DELETE /me`). Rather than permanently wiping documents which breaks audit trails, it disables the profile, clears all historical transaction logs to protect user PII, and resets the credit balance to the initial signup state.
+- **📈 Self-Optimizing Database**: Automatic startup scripts trigger creation of essential indexes (unique email constraints and descending timestamp logs) to keep query latencies low.
 
 ---
 
@@ -30,57 +40,67 @@ Welcome to the backend repository of **MedHirePro**—a robust, modern staffing 
 
 | Component | Technology | Description |
 | :--- | :--- | :--- |
-| **Language** | Python 3.12 | Modern, typed, fast backend environment |
-| **Framework** | FastAPI | High-performance ASGI framework for building APIs |
-| **Database** | MongoDB (7.0) | High-throughput, scalable Document DB |
-| **DB Driver** | Motor | Asynchronous Python driver for MongoDB |
-| **Auth & Security** | PyJWT/jose & bcrypt | Session management, password hashing, and token signatures |
-| **OAuth** | google-auth | Secure identity verification directly via Google APIs |
-| **Settings** | Pydantic-Settings | Strongly-typed environment configuration management |
-| **Server** | Uvicorn | High-performance ASGI web server |
-| **Containers** | Docker & Compose | Multi-stage production builds and zero-config local development |
+| **Language** | Python 3.12 | Modern, strongly-typed backend execution environment. |
+| **Framework** | FastAPI | High-performance ASGI framework featuring automatic OpenAPI documentation. |
+| **Database** | MongoDB 7.0+ | Scalable, high-throughput document store. |
+| **DB Driver** | Motor | Asynchronous MongoDB driver wrapping PyMongo. |
+| **Auth & Sessions**| PyJWT / jose | Session management, signature validation, and secure token claims. |
+| **Passwords** | passlib[bcrypt] | Cryptographic password salting and hashing. |
+| **OAuth 2.0** | google-auth | Secure identity verification directly via Google token endpoints. |
+| **Config** | Pydantic Settings | Strongly-typed environment variables validation. |
+| **Server** | Uvicorn | Lightweight, production-ready ASGI web server. |
+| **Containers** | Docker & Compose | Multi-stage Docker builds and unified container orchestration. |
 
 ---
 
 ## 💻 Local Development Setup
 
-### Option 1: Manual Run
-Ensure you have **Python 3.12** and **MongoDB** running locally.
+### Option 1: Manual Virtualenv Run
 
-1. **Clone and navigate to the repository:**
+Make sure you have **Python 3.12** and **MongoDB 7.0** running locally.
+
+1. **Clone the repository and enter the directory:**
    ```bash
    git clone <repo-url> medhirepro-server
    cd medhirepro-server
    ```
 
-2. **Initialize and activate virtual environment:**
+2. **Initialize and activate a virtual environment:**
    ```bash
    python -m venv .venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
-3. **Install dependencies:**
+3. **Upgrade package managers and install dependencies:**
    ```bash
    pip install --upgrade pip
    pip install -r requirements.txt
    ```
 
-4. **Start the server:**
+4. **Verify environment setup:**
+   Make sure you have created your `.env` from the `.env.example` blueprint.
+
+5. **Fire up the ASGI development server:**
    ```bash
    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    ```
    > [!TIP]
-   > The `--reload` flag watches the files in the codebase and restarts the server automatically whenever you save edits.
+   > The `--reload` flag continuously monitors file changes and triggers instant reloading upon save.
 
 ### Option 2: Docker Compose (Recommended)
-You only need Docker installed. Run the command below to start the services in unified networks:
 
-```bash
-docker-compose up --build
-```
+Requires only **Docker** and **Docker Compose** installed. This runs the app and a MongoDB instance inside an isolated virtual network with zero host dependencies.
 
-- **Hot-Reload Support**: Code editing locally will automatically synchronize into the container.
-- **Database Mapping**: Local MongoDB port is mapped to avoid port clashes with any local MongoDB instances already running on your machine.
+1. **Build images and launch services:**
+   ```bash
+   docker-compose up --build
+   ```
+
+2. **Endpoints & Hot-Reload**:
+   - The API will be active at `http://localhost:8000`.
+   - Complete interactive OpenAPI documentation is generated instantly at `http://localhost:8000/docs`.
+   - Workspace directories are mounted live; local file modifications trigger hot-reloading inside the running containers.
+   - The database persists its data state inside a local Docker volume.
 
 ---
 
