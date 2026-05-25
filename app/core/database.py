@@ -22,6 +22,7 @@ async def init_indexes():
     
     # 1. Users
     await database["users"].create_index("email", unique=True)
+    await database["users"].create_index("referral_code", unique=True, sparse=True)
     
     # 2. Credit Transactions
     await database["credit_transactions"].create_index("user_id")

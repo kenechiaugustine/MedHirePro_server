@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import Optional
 
 
 class RefreshTokenRequest(BaseModel):
@@ -6,6 +7,7 @@ class RefreshTokenRequest(BaseModel):
 
 class GoogleLoginRequest(BaseModel):
     id_token: str
+    referred_by_code: Optional[str] = None
 
 class ChangePasswordRequest(BaseModel):
     old_password: str

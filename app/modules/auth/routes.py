@@ -29,6 +29,9 @@ async def register_professional(
     # Hash Password
     hashed_password = get_password_hash(payload.password)
     
+    # Generate unique referral code for the new user
+    new_referral_code = await user_service.generate_unique_referral_code(db)
+
     # Create User
     new_user_data = UserModel.new_user(
         email=payload.email,
@@ -36,6 +39,10 @@ async def register_professional(
         full_name=payload.full_name,
         specialty=payload.specialty,
         password_hash=hashed_password,
+        employment_status=payload.employment_status,
+        current_workplace=payload.current_workplace,
+        referral_code=new_referral_code,
+        referred_by=None,
     )
     user = await user_service.create_user(db, new_user_data)
 
@@ -48,6 +55,14 @@ async def register_professional(
         description="Welcome Bonus"
     )
     await db["credit_transactions"].insert_one(tx)
+
+    # Apply Referral Code fail-silently if provided
+    if payload.referred_by_code:
+        try:
+            await user_service.apply_referral_code(db, str(user["_id"]), payload.referred_by_code)
+        except Exception:
+            # Registration succeeds, but referral fields remain null and no referral bonus credits are given
+            pass
 
     user_id = str(user["_id"])
     return {
@@ -74,12 +89,17 @@ async def register_institute(
     # Hash Password
     hashed_password = get_password_hash(payload.password)
     
+    # Generate unique referral code for the new user
+    new_referral_code = await user_service.generate_unique_referral_code(db)
+
     # Create User
     new_user_data = UserModel.new_user(
         email=payload.email,
         role=UserRole.INSTITUTE,
         facility_name=payload.facility_name,
         password_hash=hashed_password,
+        referral_code=new_referral_code,
+        referred_by=None,
     )
     user = await user_service.create_user(db, new_user_data)
 
@@ -92,6 +112,14 @@ async def register_institute(
         description="Welcome Bonus"
     )
     await db["credit_transactions"].insert_one(tx)
+
+    # Apply Referral Code fail-silently if provided
+    if payload.referred_by_code:
+        try:
+            await user_service.apply_referral_code(db, str(user["_id"]), payload.referred_by_code)
+        except Exception:
+            # Registration succeeds, but referral fields remain null and no referral bonus credits are given
+            pass
 
     user_id = str(user["_id"])
     return {
@@ -118,6 +146,9 @@ async def authenticate_google(
     user = await user_service.get_user_by_email(db, email)
 
     if not user:
+        # Generate unique referral code for the new user
+        new_referral_code = await user_service.generate_unique_referral_code(db)
+
         # Create new Google User (defaults to professional)
         new_user_data = UserModel.new_user(
             email=email,
@@ -125,6 +156,8 @@ async def authenticate_google(
             full_name=google_user.get("name"),
             avatar_url=google_user.get("picture"),
             google_id=google_user.get("sub"),
+            referral_code=new_referral_code,
+            referred_by=None,
         )
         user = await user_service.create_user(db, new_user_data)
 
@@ -137,6 +170,14 @@ async def authenticate_google(
             description="Welcome Bonus"
         )
         await db["credit_transactions"].insert_one(tx)
+
+        # Apply Referral Code fail-silently if provided
+        if payload.referred_by_code:
+            try:
+                await user_service.apply_referral_code(db, str(user["_id"]), payload.referred_by_code)
+            except Exception:
+                # Registration succeeds, but referral fields remain null and no referral bonus credits are given
+                pass
     else:
         # (Optional) Update Google ID if user registered with email before but now uses Google
         if not user.get("google_id"):

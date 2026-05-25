@@ -13,6 +13,10 @@ class UserModel:
         facility_name: Optional[str] = None,
         google_id: Optional[str] = None,
         avatar_url: Optional[str] = None,
+        employment_status: Optional[str] = None,
+        current_workplace: Optional[str] = None,
+        referral_code: Optional[str] = None,
+        referred_by: Optional[str] = None,
     ) -> dict:
         return {
             "email": email,
@@ -27,6 +31,11 @@ class UserModel:
             "daily_credit_cap": 20,             # Default cap per user
             "is_active": True,
             "is_deleted": False,
+            "employment_status": employment_status,
+            "current_workplace": current_workplace,
+            "referral_code": referral_code,
+            "referred_by": referred_by,
+            "referred_count": 0,
             "created_at": datetime.now(timezone.utc),
             "updated_at": datetime.now(timezone.utc),
         }
