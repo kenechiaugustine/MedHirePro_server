@@ -62,13 +62,3 @@ class UserResponse(UserBase):
 
     class Config:
         populate_by_name = True
-
-# Referral Details Response Schema
-class UserReferralDetailsResponse(BaseModel):
-    referral_code: Optional[str] = None
-    referred_count: int = 0
-    referred_by: Optional[str] = None
-    total_referral_credits_earned: int = 0
-
-class ApplyReferralRequest(BaseModel):
-    referral_code: str = Field(..., description="Referral code to apply")
