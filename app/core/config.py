@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from typing import Optional
 
 class Settings(BaseSettings):
     PROJECT_NAME: str
@@ -12,6 +13,11 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str
     ADMIN_SECRET_KEY: str
     BACKEND_CORS_ORIGINS: list[str] = []
+    
+    # Cloudinary Config (Optional, with local fallback)
+    CLOUDINARY_CLOUD_NAME: Optional[str] = None
+    CLOUDINARY_API_KEY: Optional[str] = None
+    CLOUDINARY_API_SECRET: Optional[str] = None
 
     class Config:
         env_file = ".env"

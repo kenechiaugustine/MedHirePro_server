@@ -31,6 +31,8 @@ class UserModel:
             "daily_credit_cap": 20,             # Default cap per user
             "is_active": True,
             "is_deleted": False,
+            "onboarding_status": "pending",
+            "is_verified": False,
             "employment_status": employment_status,
             "current_workplace": current_workplace,
             "referral_code": referral_code,

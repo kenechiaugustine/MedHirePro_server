@@ -52,6 +52,8 @@ class UserResponse(UserBase):
     daily_credit_cap: int = 20
     is_active: bool
     is_deleted: bool = False
+    onboarding_status: str = "pending"
+    is_verified: bool = False
     employment_status: Optional[str] = None
     current_workplace: Optional[str] = None
     referral_code: Optional[str] = None
