@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
-from typing import List
 from app.core.database import get_database
 from app.core.security import get_current_user_id
 from app.modules.media import service
@@ -10,35 +9,25 @@ router = APIRouter()
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
 async def upload_media(
-    files: List[UploadFile] = File(...),
+    file: UploadFile = File(..., description="Select a file to upload"),
     user_id: str = Depends(get_current_user_id),
     db = Depends(get_database)
 ):
     """
-    Uploads between 1 and 5 files to Cloudinary (or local storage fallback).
+    Uploads a single file to Cloudinary (or local storage fallback).
     Saves metadata in MongoDB.
     """
-    if not files:
+    if not file or not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No files provided for upload"
+            detail="No file provided for upload"
         )
         
-    if len(files) > 5:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Maximum of 5 files allowed per upload request"
-        )
-        
-    uploaded_assets = []
-    for file in files:
-        # Upload individual file
-        asset = await service.upload_media_file(db, user_id, file)
-        uploaded_assets.append(asset)
-        
+    asset = await service.upload_media_file(db, user_id, file)
+    
     return {
-        "message": f"Successfully uploaded {len(uploaded_assets)} file(s)",
-        "media": uploaded_assets
+        "message": "Successfully uploaded file",
+        "media": asset
     }
 
 
