@@ -82,7 +82,7 @@ Make sure you have **Python 3.12** and **MongoDB 7.0** running locally.
 
 5. **Fire up the ASGI development server:**
    ```bash
-   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
    ```
    > [!TIP]
    > The `--reload` flag continuously monitors file changes and triggers instant reloading upon save.
@@ -97,8 +97,8 @@ Requires only **Docker** and **Docker Compose** installed. This runs the app and
    ```
 
 2. **Endpoints & Hot-Reload**:
-   - The API will be active at `http://localhost:8000`.
-   - Complete interactive OpenAPI documentation is generated instantly at `http://localhost:8000/docs`.
+   - The API will be active at `http://localhost:8080`.
+   - Complete interactive OpenAPI documentation is generated instantly at `http://localhost:8080/docs`.
    - Workspace directories are mounted live; local file modifications trigger hot-reloading inside the running containers.
    - The database persists its data state inside a local Docker volume.
 
