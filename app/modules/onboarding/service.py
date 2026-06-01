@@ -65,7 +65,7 @@ async def submit_onboarding(db: AsyncIOMotorDatabase, user_id: str, role: str, d
     await db["users"].update_one(
         {"_id": ObjectId(user_id)},
         {"$set": {
-            "onboarding_status": OnboardingStatus.SUBMITTED.value,
+            "onboarding_status": OnboardingStatus.PENDING.value,
             "updated_at": datetime.now(timezone.utc)
         }}
     )
@@ -95,7 +95,7 @@ async def list_pending_submissions(db: AsyncIOMotorDatabase, skip: int = 0, limi
     Lists all onboarding submissions that are currently pending review (status = 'submitted').
     Enriches with user metadata.
     """
-    cursor = db["onboarding_submissions"].find({"status": OnboardingStatus.SUBMITTED.value})
+    cursor = db["onboarding_submissions"].find({"status": OnboardingStatus.PENDING.value})
     # FIFO order: earliest submissions first
     cursor = cursor.sort("submitted_at", 1).skip(skip).limit(limit)
     

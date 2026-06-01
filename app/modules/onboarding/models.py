@@ -13,7 +13,7 @@ class OnboardingSubmissionModel:
             "user_id": user_id,
             "role": role,
             "details": details,
-            "status": OnboardingStatus.SUBMITTED.value,
+            "status": OnboardingStatus.PENDING.value,
             "submitted_at": datetime.now(timezone.utc),
             "reviewed_at": None,
             "reviewed_by": None,

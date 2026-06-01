@@ -85,7 +85,7 @@ async def get_my_onboarding_status(
         
     submission = await service.get_onboarding_status(db, user_id)
     return {
-        "onboarding_status": user.get("onboarding_status", "pending"),
+        "onboarding_status": user.get("onboarding_status", "not_started"),
         "is_verified": user.get("is_verified", False),
         "submission": submission
     }
