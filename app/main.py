@@ -12,6 +12,11 @@ from app.modules.referral.routes import router as referral_router
 from app.modules.media.routes import router as media_router
 from app.modules.onboarding.routes import router as onboarding_router
 from app.modules.admin.routes import router as admin_router
+from app.modules.jobs.routes import router as jobs_router
+
+from app.modules.applications.routes import router as applications_router
+
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -50,3 +55,5 @@ app.include_router(credits_router, prefix=f"{settings.API_V1_STR}/credits", tags
 app.include_router(media_router, prefix=f"{settings.API_V1_STR}/media", tags=["Media"])
 app.include_router(onboarding_router, prefix=f"{settings.API_V1_STR}/onboarding", tags=["Onboarding"])
 app.include_router(admin_router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin"])
+app.include_router(jobs_router, prefix=f"{settings.API_V1_STR}/jobs", tags=["Job Listings"])
+app.include_router(applications_router, prefix=f"{settings.API_V1_STR}/applications", tags=["Applications"])

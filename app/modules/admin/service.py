@@ -127,3 +127,37 @@ async def get_user_referrals(
     referred_users = await cursor.to_list(length=limit)
     
     return [_format_user(u) for u in referred_users]
+
+
+async def reassign_job_owner(
+    db: AsyncIOMotorDatabase,
+    job_id: str,
+    new_owner_id: str,
+    new_owner_role: str
+) -> Optional[dict]:
+    """
+    Reassigns the posted_by and poster_type fields of a job listing to a new user.
+    """
+    from datetime import datetime, timezone
+    if not ObjectId.is_valid(job_id) or not ObjectId.is_valid(new_owner_id):
+        return None
+        
+    result = await db["job_listings"].update_one(
+        {"_id": ObjectId(job_id)},
+        {
+            "$set": {
+                "posted_by": ObjectId(new_owner_id),
+                "poster_type": new_owner_role,
+                "updated_at": datetime.now(timezone.utc)
+            }
+        }
+    )
+    if result.matched_count == 0:
+        return None
+        
+    updated = await db["job_listings"].find_one({"_id": ObjectId(job_id)})
+    if updated:
+        from app.modules.jobs.service import serialize_doc
+        return serialize_doc(updated)
+    return None
+

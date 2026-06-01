@@ -10,8 +10,12 @@ from app.modules.user.enums import UserRole
 from app.modules.credits import schemas as credits_schemas
 from app.modules.credits import enums as credits_enums
 from app.modules.admin import service
+from app.modules.admin.schemas import ReassignJobPayload
+from app.modules.jobs.enums import JobType
+from app.modules.user import service as user_service
 
 router = APIRouter()
+
 
 @router.get("/users", response_model=List[user_schemas.UserResponse])
 async def read_all_users(
@@ -87,3 +91,59 @@ async def read_user_referrals(
         page=page,
         limit=limit
     )
+
+
+@router.put("/jobs/{vacancy_id}/reassign", status_code=200)
+async def admin_reassign_job_owner(
+    vacancy_id: str,
+    payload: ReassignJobPayload,
+    db = Depends(get_database),
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Reassigns a clinical permanent job or a locum shift to a different host user.
+    - **Permanent Job Rules**: Can only be reassigned to a user with role 'institute'.
+    - **Locum Job Rules**: Can only be reassigned to a user with role 'professional' or 'institute'.
+    - **Access Requirement**: Only accessible by Administrators.
+    """
+    if not ObjectId.is_valid(vacancy_id):
+        raise HTTPException(status_code=400, detail="Invalid job ID format")
+    if not ObjectId.is_valid(payload.new_owner_id):
+        raise HTTPException(status_code=400, detail="Invalid new owner ID format")
+
+    # 1. Fetch new owner & validate role constraints
+    new_owner = await user_service.get_user_by_id(db, payload.new_owner_id)
+    if not new_owner:
+        raise HTTPException(status_code=404, detail="New owner profile not found")
+    if not new_owner.get("is_active"):
+        raise HTTPException(status_code=400, detail="New owner account is deactivated")
+
+    role = new_owner.get("role")
+    if payload.job_type == JobType.PERMANENT:
+        if role != "institute":
+            raise HTTPException(
+                status_code=400,
+                detail="Permanent clinical vacancies can only be reassigned to users with role 'institute'."
+            )
+    else:
+        if role not in ["professional", "institute"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Locum assignments can only be reassigned to users with role 'professional' or 'institute'."
+            )
+
+    # 2. Perform reassignment
+    updated = await service.reassign_job_owner(
+        db=db,
+        job_id=vacancy_id,
+        new_owner_id=payload.new_owner_id,
+        new_owner_role=role
+    )
+    if not updated:
+        raise HTTPException(
+            status_code=404,
+            detail="Target job listing not found in the collection."
+        )
+
+    return {"message": "Job successfully reassigned", "updated_job": updated}
+
