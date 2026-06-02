@@ -10,7 +10,7 @@ from app.modules.user.enums import UserRole
 from app.modules.credits import schemas as credits_schemas
 from app.modules.credits import enums as credits_enums
 from app.modules.admin import service
-from app.modules.admin.schemas import ReassignJobPayload
+from app.modules.admin.schemas import ReassignJobPayload, AdminUserUpdatePayload
 from app.modules.jobs.enums import JobType
 from app.modules.user import service as user_service
 
@@ -91,6 +91,39 @@ async def read_user_referrals(
         page=page,
         limit=limit
     )
+
+
+@router.get("/users/{user_id}", response_model=user_schemas.UserResponse)
+async def read_user_by_id(
+    user_id: str,
+    db = Depends(get_database),
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Fetch details of a single user by their ID.
+    Only accessible by administrators.
+    """
+    user = await service.get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User profile not found")
+    return user
+
+
+@router.put("/users/{user_id}", response_model=user_schemas.UserResponse)
+async def admin_update_user_details(
+    user_id: str,
+    payload: AdminUserUpdatePayload,
+    db = Depends(get_database),
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Modify details of any user comprehensively.
+    Only accessible by administrators.
+    """
+    updated = await service.update_user_details(db, user_id, payload.model_dump())
+    if not updated:
+        raise HTTPException(status_code=404, detail="User profile not found or failed to update")
+    return updated
 
 
 @router.put("/jobs/{vacancy_id}/reassign", status_code=200)

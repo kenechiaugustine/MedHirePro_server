@@ -161,3 +161,35 @@ async def reassign_job_owner(
         return serialize_doc(updated)
     return None
 
+async def get_user_by_id(db: AsyncIOMotorDatabase, user_id: str) -> Optional[dict]:
+    """Fetch a single user by their ID, formatted correctly."""
+    if not ObjectId.is_valid(user_id):
+        return None
+    user = await db["users"].find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return None
+    return _format_user(user)
+
+async def update_user_details(db: AsyncIOMotorDatabase, user_id: str, update_data: dict) -> Optional[dict]:
+    """Updates a user profile or account parameters comprehensively."""
+    if not ObjectId.is_valid(user_id):
+        return None
+        
+    update_fields = {k: v for k, v in update_data.items() if v is not None}
+    if not update_fields:
+        return await get_user_by_id(db, user_id)
+        
+    # Set updated_at timestamp
+    from datetime import datetime, timezone
+    update_fields["updated_at"] = datetime.now(timezone.utc)
+    
+    result = await db["users"].update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": update_fields}
+    )
+    
+    if result.matched_count == 0:
+        return None
+        
+    return await get_user_by_id(db, user_id)
+
