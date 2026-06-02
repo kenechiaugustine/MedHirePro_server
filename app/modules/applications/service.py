@@ -160,6 +160,16 @@ async def has_user_applied(db: AsyncIOMotorDatabase, candidate_id: str, vacancy_
     })
     return count > 0
 
+async def get_user_application_for_vacancy(db: AsyncIOMotorDatabase, candidate_id: str, vacancy_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieves an application submitted by a candidate for a specific vacancy."""
+    if not ObjectId.is_valid(candidate_id) or not ObjectId.is_valid(vacancy_id):
+        return None
+    doc = await db["applications"].find_one({
+        "candidate_id": ObjectId(candidate_id),
+        "vacancy_id": ObjectId(vacancy_id)
+    })
+    return serialize_doc(doc)
+
 async def update_application_shortlist(db: AsyncIOMotorDatabase, application_id: str, is_shortlisted: bool) -> Optional[Dict[str, Any]]:
     """
     Sets shortlist flag.

@@ -190,6 +190,25 @@ async def list_my_applications(
     )
 
 @router.get(
+    "/check-applied", 
+    response_model=dict,
+    summary="Check if user has already applied for a job listing"
+)
+async def check_user_has_applied(
+    vacancy_id: str = Query(..., description="The ID of the vacancy/job listing"),
+    user_id: str = Depends(get_current_user_id),
+    db = Depends(get_database)
+):
+    """
+    Returns whether the currently authenticated professional user has already applied for a specific job listing,
+    and returns the details of the application if it exists.
+    """
+    application = await service.get_user_application_for_vacancy(db, user_id, vacancy_id)
+    if application:
+        return {"applied": True, "application": application}
+    return {"applied": False, "application": None}
+
+@router.get(
     "/{application_id}", 
     response_model=schemas.ApplicationResponse,
     summary="Get application details"
