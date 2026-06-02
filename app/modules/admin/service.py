@@ -4,37 +4,6 @@ from typing import Optional, List, Any
 from app.modules.user.enums import UserRole
 from app.modules.credits import service as credits_service
 from app.modules.credits.enums import CreditType, CreditSource
-
-async def get_all_users(
-    db: AsyncIOMotorDatabase,
-    page: int = 1,
-    limit: int = 10,
-    role: Optional[UserRole] = None,
-    is_active: Optional[bool] = None,
-    search: Optional[str] = None
-) -> List[dict]:
-    """
-    Fetch all users with filtering, search, and pagination.
-    """
-    query: dict[str, Any] = {}
-    
-    if role:
-        query["role"] = role
-        
-    if is_active is not None:
-        query["is_active"] = is_active
-        
-    if search:
-        # Case-insensitive search on email, full name, or facility name
-        query["$or"] = [
-            {"email": {"$regex": search, "$options": "i"}},
-            {"full_name": {"$regex": search, "$options": "i"}},
-            {"facility_name": {"$regex": search, "$options": "i"}}
-        ]
-        
-    skip = (page - 1) * limit
-    cursor = db["users"].find(query).skip(skip).limit(limit)
-    users = await cursor.to_list(length=limit)
     
 def _format_user(user: dict) -> dict:
     """
@@ -83,7 +52,7 @@ async def get_all_users(
         ]
         
     skip = (page - 1) * limit
-    cursor = db["users"].find(query).skip(skip).limit(limit)
+    cursor = db["users"].find(query).skip(skip).limit(limit).sort("created_at", -1)
     users = await cursor.to_list(length=limit)
     
     return [_format_user(u) for u in users]
@@ -123,11 +92,10 @@ async def get_user_referrals(
         return []
         
     skip = (page - 1) * limit
-    cursor = db["users"].find({"referred_by": ObjectId(user_id)}).skip(skip).limit(limit)
+    cursor = db["users"].find({"referred_by": ObjectId(user_id)}).skip(skip).limit(limit).sort("created_at", -1)
     referred_users = await cursor.to_list(length=limit)
     
     return [_format_user(u) for u in referred_users]
-
 
 async def reassign_job_owner(
     db: AsyncIOMotorDatabase,
