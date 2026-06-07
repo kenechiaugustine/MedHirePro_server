@@ -285,3 +285,51 @@ async def refresh_token(
         "token_type": "bearer",
         "user_role": user.get("role", UserRole.PROFESSIONAL)
     }
+
+
+@router.post("/seed-admin", status_code=status.HTTP_201_CREATED)
+async def seed_admin(
+    db = Depends(get_database)
+):
+    email = "admin.medhirepro@yopmail.com"
+    
+    # Check if email exists
+    existing_user = await user_service.get_user_by_email(db, email)
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Admin account already exists."
+        )
+
+    # Hash Password
+    hashed_password = get_password_hash("passcode")
+    
+    # Generate unique referral code for the admin
+    new_referral_code = await referral_service.generate_unique_referral_code(db)
+
+    # Create User
+    new_user_data = UserModel.new_user(
+        email=email,
+        role=UserRole.ADMIN,
+        password_hash=hashed_password,
+        full_name="MedHirePro Administrator",
+        referral_code=new_referral_code,
+    )
+    
+    # Set onboarding status to approved and verified
+    new_user_data["onboarding_status"] = "approved"
+    new_user_data["is_verified"] = True
+
+    # Insert into database
+    user = await user_service.create_user(db, new_user_data)
+    
+    return {
+        "message": "Admin account seeded successfully",
+        "user": {
+            "id": str(user["_id"]),
+            "email": user["email"],
+            "role": user["role"],
+            "onboarding_status": user["onboarding_status"],
+            "is_verified": user["is_verified"]
+        }
+    }
