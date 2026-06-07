@@ -231,21 +231,28 @@ async def read_application(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application record not found.")
 
     role = user.get("role")
-    if role == "professional" and application["candidate_id"] != user_id:
+    candidate_id = application.get("candidate_id")
+    if isinstance(candidate_id, ObjectId):
+        candidate_id = str(candidate_id)
+
+    posted_by = None
+    vacancy_info = application.get("vacancy_id")
+    if isinstance(vacancy_info, dict):
+        posted_by = vacancy_info.get("posted_by")
+    else:
+        vac = await jobs_service.get_job_listing_by_id(db, str(vacancy_info))
+        if vac:
+            posted_by = vac.get("posted_by")
+    if isinstance(posted_by, ObjectId):
+        posted_by = str(posted_by)
+
+    # Allow access if the user is the candidate, the job owner (posting facility/user), or an admin
+    is_owner = (str(posted_by) == user_id)
+    is_candidate = (str(candidate_id) == user_id)
+    is_admin = (role == "admin")
+
+    if not (is_owner or is_candidate or is_admin):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
-    
-    if role == "institute":
-        posted_by = None
-        vacancy_info = application["vacancy_id"]
-        if isinstance(vacancy_info, dict):
-            posted_by = vacancy_info.get("posted_by")
-        else:
-            vac = await jobs_service.get_job_listing_by_id(db, str(vacancy_info))
-            if vac:
-                posted_by = vac["posted_by"]
-        
-        if posted_by != user_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
 
     return application
 

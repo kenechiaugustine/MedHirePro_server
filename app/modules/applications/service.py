@@ -28,7 +28,7 @@ def serialize_doc(doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     return serialized
 
 async def populate_application_vacancy(db: AsyncIOMotorDatabase, doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    """Serializes the application doc and populates its vacancy_id with full job details from the unified collection."""
+    """Serializes the application doc and populates its vacancy_id with full job details and candidate details."""
     if not doc:
         return None
     serialized = serialize_doc(doc)
@@ -43,6 +43,21 @@ async def populate_application_vacancy(db: AsyncIOMotorDatabase, doc: Optional[D
         job = await jobs_service.get_job_listing_by_id(db, vacancy_id_str)
         if job:
             serialized["vacancy_id"] = job
+
+    # Populate candidate details
+    candidate_id = doc.get("candidate_id")
+    if candidate_id:
+        candidate_id_str = str(candidate_id)
+        from app.modules.user import service as user_service
+        user = await user_service.get_user_by_id(db, candidate_id_str)
+        if user:
+            serialized["candidate_details"] = {
+                "id": str(user.get("_id") or user.get("id")),
+                "full_name": user.get("full_name"),
+                "email": user.get("email"),
+                "specialty": user.get("specialty"),
+                "avatar_url": user.get("avatar_url"),
+            }
                 
     return serialized
 
@@ -138,10 +153,38 @@ async def get_applications(
                 }
             }
         },
-        # Project out the vacancy_details array
+        # Join with users collection for candidate details
+        {
+            "$lookup": {
+                "from": "users",
+                "localField": "candidate_id",
+                "foreignField": "_id",
+                "as": "candidate_details_arr"
+            }
+        },
+        {
+            "$addFields": {
+                "candidate_details": {
+                    "$let": {
+                        "vars": {
+                            "candidate": {"$arrayElemAt": ["$candidate_details_arr", 0]}
+                        },
+                        "in": {
+                            "id": {"$toString": "$$candidate._id"},
+                            "full_name": "$$candidate.full_name",
+                            "email": "$$candidate.email",
+                            "specialty": "$$candidate.specialty",
+                            "avatar_url": "$$candidate.avatar_url"
+                        }
+                    }
+                }
+            }
+        },
+        # Project out temporary arrays
         {
             "$project": {
-                "vacancy_details": 0
+                "vacancy_details": 0,
+                "candidate_details_arr": 0
             }
         }
     ]

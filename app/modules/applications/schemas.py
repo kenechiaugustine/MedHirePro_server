@@ -17,9 +17,17 @@ class ApplicationShortlistUpdate(BaseModel):
 class ApplicationAcceptUpdate(BaseModel):
     is_accepted: bool
 
+class CandidateDetails(BaseModel):
+    id: str
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    specialty: Optional[str] = None
+    avatar_url: Optional[str] = None
+
 class ApplicationResponse(BaseModel):
     id: str = Field(alias="_id")
     candidate_id: str
+    candidate_details: Optional[CandidateDetails] = None
     vacancy_id: Union[JobListingResponse, str]
     vacancy_type: JobType
     curriculum_vitae_url: str
