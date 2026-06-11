@@ -185,9 +185,23 @@ async def review_onboarding(
                 user_updates["employment_status"] = details["employment_status"]
             if details.get("current_workplace"):
                 user_updates["current_workplace"] = details["current_workplace"]
+            
+            # Sync professional onboarding details
+            user_updates["is_intern"] = details.get("is_intern", False)
+            user_updates["licence_number"] = details.get("licence_number")
+            user_updates["licence_expiry"] = details.get("licence_expiry")
+            user_updates["licence_document_url"] = details.get("licence_document_url")
+            user_updates["degree_document_url"] = details.get("degree_document_url")
+            user_updates["id_document_url"] = details.get("id_document_url")
+            user_updates["school_or_placement_letter_url"] = details.get("school_or_placement_letter_url")
         elif role == "institute":
-            # For facility, facility name is preserved, but we could sync address details if needed.
-            pass
+            # Sync institute onboarding details
+            user_updates["business_registration_number"] = details.get("business_registration_number")
+            user_updates["facility_type"] = details.get("facility_type")
+            user_updates["business_license_url"] = details.get("business_license_url")
+            user_updates["proof_of_address_url"] = details.get("proof_of_address_url")
+            user_updates["representative_id_url"] = details.get("representative_id_url")
+            user_updates["facility_address"] = details.get("facility_address")
             
         # Update user
         await db["users"].update_one(

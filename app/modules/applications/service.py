@@ -57,6 +57,16 @@ async def populate_application_vacancy(db: AsyncIOMotorDatabase, doc: Optional[D
                 "email": user.get("email"),
                 "specialty": user.get("specialty"),
                 "avatar_url": user.get("avatar_url"),
+                "is_verified": user.get("is_verified", False),
+                "employment_status": user.get("employment_status"),
+                "current_workplace": user.get("current_workplace"),
+                "is_intern": user.get("is_intern"),
+                "licence_number": user.get("licence_number"),
+                "licence_expiry": user.get("licence_expiry"),
+                "licence_document_url": user.get("licence_document_url"),
+                "degree_document_url": user.get("degree_document_url"),
+                "id_document_url": user.get("id_document_url"),
+                "school_or_placement_letter_url": user.get("school_or_placement_letter_url"),
             }
                 
     return serialized
@@ -174,7 +184,17 @@ async def get_applications(
                             "full_name": "$$candidate.full_name",
                             "email": "$$candidate.email",
                             "specialty": "$$candidate.specialty",
-                            "avatar_url": "$$candidate.avatar_url"
+                            "avatar_url": "$$candidate.avatar_url",
+                            "is_verified": {"$ifNull": ["$$candidate.is_verified", False]},
+                            "employment_status": "$$candidate.employment_status",
+                            "current_workplace": "$$candidate.current_workplace",
+                            "is_intern": "$$candidate.is_intern",
+                            "licence_number": "$$candidate.licence_number",
+                            "licence_expiry": "$$candidate.licence_expiry",
+                            "licence_document_url": "$$candidate.licence_document_url",
+                            "degree_document_url": "$$candidate.degree_document_url",
+                            "id_document_url": "$$candidate.id_document_url",
+                            "school_or_placement_letter_url": "$$candidate.school_or_placement_letter_url"
                         }
                     }
                 }

@@ -23,6 +23,16 @@ class CandidateDetails(BaseModel):
     email: Optional[str] = None
     specialty: Optional[str] = None
     avatar_url: Optional[str] = None
+    is_verified: bool = False
+    employment_status: Optional[str] = None
+    current_workplace: Optional[str] = None
+    is_intern: Optional[bool] = None
+    licence_number: Optional[str] = None
+    licence_expiry: Optional[str] = None
+    licence_document_url: Optional[str] = None
+    degree_document_url: Optional[str] = None
+    id_document_url: Optional[str] = None
+    school_or_placement_letter_url: Optional[str] = None
 
 class ApplicationResponse(BaseModel):
     id: str = Field(alias="_id")
