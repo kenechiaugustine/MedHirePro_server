@@ -21,7 +21,11 @@ def serialize_doc(doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
             if "_id" in vacancy_id:
                 vacancy_id["_id"] = str(vacancy_id["_id"])
             if "posted_by" in vacancy_id:
-                vacancy_id["posted_by"] = str(vacancy_id["posted_by"])
+                if isinstance(vacancy_id["posted_by"], ObjectId):
+                    vacancy_id["posted_by"] = str(vacancy_id["posted_by"])
+                elif isinstance(vacancy_id["posted_by"], dict):
+                    if "_id" in vacancy_id["posted_by"]:
+                        vacancy_id["posted_by"]["_id"] = str(vacancy_id["posted_by"]["_id"])
         else:
             serialized["vacancy_id"] = str(vacancy_id)
             
@@ -97,7 +101,10 @@ async def create_application(db: AsyncIOMotorDatabase, candidate_id: str, app_da
     doc["vacancy_id"] = ObjectId(doc["vacancy_id"])
     result = await db["applications"].insert_one(doc)
     created = await db["applications"].find_one({"_id": result.inserted_id})
-    return await populate_application_vacancy(db, created)
+    populated = await populate_application_vacancy(db, created)
+    if populated is None:
+        raise RuntimeError("Failed to retrieve application after creation")
+    return populated
 
 async def get_application_by_id(db: AsyncIOMotorDatabase, application_id: str) -> Optional[Dict[str, Any]]:
     """Retrieves a single application by ID with populated vacancy details."""
@@ -147,8 +154,47 @@ async def get_applications(
         {
             "$lookup": {
                 "from": "job_listings",
-                "localField": "vacancy_id",
-                "foreignField": "_id",
+                "let": {"vacancy_oid": "$vacancy_id"},
+                "pipeline": [
+                    {"$match": {"$expr": {"$eq": ["$_id", "$$vacancy_oid"]}}},
+                    # Lookup the poster user for the job listing
+                    {
+                        "$lookup": {
+                            "from": "users",
+                            "localField": "posted_by",
+                            "foreignField": "_id",
+                            "as": "poster_details"
+                        }
+                    },
+                    {
+                        "$addFields": {
+                            "posted_by": {
+                                "$let": {
+                                    "vars": {"poster": {"$arrayElemAt": ["$poster_details", 0]}},
+                                    "in": {
+                                        "$cond": {
+                                            "if": {"$not": ["$$poster"]},
+                                            "then": "$posted_by",
+                                            "else": {
+                                                "_id": "$$poster._id",
+                                                "full_name": "$$poster.full_name",
+                                                "facility_name": "$$poster.facility_name",
+                                                "avatar_url": "$$poster.avatar_url",
+                                                "role": "$$poster.role",
+                                                "is_verified": {"$ifNull": ["$$poster.is_verified", False]}
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "$project": {
+                            "poster_details": 0
+                        }
+                    }
+                ],
                 "as": "vacancy_details"
             }
         },
@@ -211,7 +257,8 @@ async def get_applications(
 
     cursor = db["applications"].aggregate(pipeline)
     docs = await cursor.to_list(length=limit)
-    return [serialize_doc(d) for d in docs]
+    serialized = [serialize_doc(d) for d in docs]
+    return [s for s in serialized if s is not None]
 
 async def has_user_applied(db: AsyncIOMotorDatabase, candidate_id: str, vacancy_id: str) -> bool:
     """Checks if a candidate has already applied to a particular vacancy."""

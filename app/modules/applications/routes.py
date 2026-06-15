@@ -103,7 +103,8 @@ async def list_applications(
             job = await jobs_service.get_job_listing_by_id(db, vacancy_id)
             if not job:
                 return []
-            if job["posted_by"] != user_id:
+            posted_by_id = job["posted_by"].get("_id") if isinstance(job["posted_by"], dict) else job["posted_by"]
+            if posted_by_id != user_id:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="You are only authorized to query applications for job listings you published."
@@ -243,6 +244,8 @@ async def read_application(
         vac = await jobs_service.get_job_listing_by_id(db, str(vacancy_info))
         if vac:
             posted_by = vac.get("posted_by")
+    if isinstance(posted_by, dict):
+        posted_by = posted_by.get("_id")
     if isinstance(posted_by, ObjectId):
         posted_by = str(posted_by)
 
@@ -289,6 +292,8 @@ async def shortlist_application(
         vac = await jobs_service.get_job_listing_by_id(db, str(vacancy_info))
         if vac:
             posted_by = vac["posted_by"]
+            if isinstance(posted_by, dict):
+                posted_by = posted_by.get("_id")
 
     if not posted_by:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Targeted job listing no longer exists.")
@@ -337,6 +342,8 @@ async def accept_application(
         vac = await jobs_service.get_job_listing_by_id(db, str(vacancy_info))
         if vac:
             posted_by = vac["posted_by"]
+            if isinstance(posted_by, dict):
+                posted_by = posted_by.get("_id")
 
     if not posted_by:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Targeted job listing no longer exists.")
@@ -384,6 +391,8 @@ async def update_status_directly(
         vac = await jobs_service.get_job_listing_by_id(db, str(vacancy_info))
         if vac:
             posted_by = vac["posted_by"]
+            if isinstance(posted_by, dict):
+                posted_by = posted_by.get("_id")
 
     if not posted_by:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Targeted job listing no longer exists.")

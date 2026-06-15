@@ -234,7 +234,8 @@ async def modify_job_listing(
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job listing not found.")
 
-    if job["posted_by"] != user_id and user.get("role") != "admin":
+    posted_by_id = job["posted_by"].get("_id") if isinstance(job["posted_by"], dict) else job["posted_by"]
+    if posted_by_id != user_id and user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have authorization to edit this job listing."
@@ -267,7 +268,8 @@ async def remove_job_listing(
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job listing not found.")
 
-    if job["posted_by"] != user_id and user.get("role") != "admin":
+    posted_by_id = job["posted_by"].get("_id") if isinstance(job["posted_by"], dict) else job["posted_by"]
+    if posted_by_id != user_id and user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have authorization to delete this job listing."

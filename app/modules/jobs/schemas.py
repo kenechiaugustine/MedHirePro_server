@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Union
 from datetime import datetime
 from app.modules.jobs.enums import (
     JobType,
@@ -90,9 +90,21 @@ class JobListingUpdate(BaseModel):
     travel_housing_reimbursement: Optional[bool] = None
     on_call_requirements: Optional[str] = None
 
+class PostedByResponse(BaseModel):
+    id: str = Field(alias="_id")
+    full_name: Optional[str] = None
+    facility_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    role: str
+    is_verified: bool = False
+
+    class Config:
+        populate_by_name = True
+        from_attributes = True
+
 class JobListingResponse(BaseModel):
     id: str = Field(alias="_id")
-    posted_by: str
+    posted_by: Union[PostedByResponse, str]
     poster_type: str
     job_type: JobType
     status: JobStatus

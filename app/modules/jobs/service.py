@@ -18,7 +18,11 @@ def serialize_doc(doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     if "_id" in serialized:
         serialized["_id"] = str(serialized["_id"])
     if "posted_by" in serialized and serialized["posted_by"]:
-        serialized["posted_by"] = str(serialized["posted_by"])
+        if isinstance(serialized["posted_by"], ObjectId):
+            serialized["posted_by"] = str(serialized["posted_by"])
+        elif isinstance(serialized["posted_by"], dict):
+            if "_id" in serialized["posted_by"]:
+                serialized["posted_by"]["_id"] = str(serialized["posted_by"]["_id"])
     return serialized
 
 async def create_job_listing(db: AsyncIOMotorDatabase, posted_by: str, job_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -34,14 +38,59 @@ async def create_job_listing(db: AsyncIOMotorDatabase, posted_by: str, job_data:
     doc["posted_by"] = ObjectId(posted_by)
     result = await db["job_listings"].insert_one(doc)
     created = await db["job_listings"].find_one({"_id": result.inserted_id})
-    return serialize_doc(created)
+    serialized = serialize_doc(created)
+    if serialized is None:
+        raise RuntimeError("Failed to retrieve job listing after creation")
+    return serialized
 
 async def get_job_listing_by_id(db: AsyncIOMotorDatabase, job_id: str) -> Optional[Dict[str, Any]]:
-    """Retrieves a single job listing by ID."""
+    """Retrieves a single job listing by ID with natively populated posted_by details using MongoDB aggregation."""
     if not ObjectId.is_valid(job_id):
         return None
-    doc = await db["job_listings"].find_one({"_id": ObjectId(job_id)})
-    return serialize_doc(doc)
+    pipeline = [
+        {"$match": {"_id": ObjectId(job_id)}},
+        {
+            "$lookup": {
+                "from": "users",
+                "localField": "posted_by",
+                "foreignField": "_id",
+                "as": "poster_details"
+            }
+        },
+        {
+            "$addFields": {
+                "posted_by": {
+                    "$let": {
+                        "vars": {"poster": {"$arrayElemAt": ["$poster_details", 0]}},
+                        "in": {
+                            "$cond": {
+                                "if": {"$not": ["$$poster"]},
+                                "then": "$posted_by",
+                                "else": {
+                                    "_id": "$$poster._id",
+                                    "full_name": "$$poster.full_name",
+                                    "facility_name": "$$poster.facility_name",
+                                    "avatar_url": "$$poster.avatar_url",
+                                    "role": "$$poster.role",
+                                    "is_verified": {"$ifNull": ["$$poster.is_verified", False]}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "$project": {
+                "poster_details": 0
+            }
+        }
+    ]
+    cursor = db["job_listings"].aggregate(pipeline)
+    docs = await cursor.to_list(length=1)
+    if not docs:
+        return None
+    return serialize_doc(docs[0])
 
 async def get_job_listings(
     db: AsyncIOMotorDatabase,
@@ -53,7 +102,7 @@ async def get_job_listings(
     page: int = 1,
     limit: int = 10,
 ) -> List[Dict[str, Any]]:
-    """Retrieves list of job listings with dynamic filters and pagination."""
+    """Retrieves list of job listings with dynamic filters, pagination, and natively populated posted_by details using MongoDB aggregation."""
     query: Dict[str, Any] = {}
     if posted_by and ObjectId.is_valid(posted_by):
         query["posted_by"] = ObjectId(posted_by)
@@ -67,9 +116,52 @@ async def get_job_listings(
         query["status"] = status
 
     skip = (page - 1) * limit
-    cursor = db["job_listings"].find(query).sort("created_at", -1).skip(skip).limit(limit)
+    pipeline = [
+        {"$match": query},
+        {"$sort": {"created_at": -1}},
+        {"$skip": skip},
+        {"$limit": limit},
+        {
+            "$lookup": {
+                "from": "users",
+                "localField": "posted_by",
+                "foreignField": "_id",
+                "as": "poster_details"
+            }
+        },
+        {
+            "$addFields": {
+                "posted_by": {
+                    "$let": {
+                        "vars": {"poster": {"$arrayElemAt": ["$poster_details", 0]}},
+                        "in": {
+                            "$cond": {
+                                "if": {"$not": ["$$poster"]},
+                                "then": "$posted_by",
+                                "else": {
+                                    "_id": "$$poster._id",
+                                    "full_name": "$$poster.full_name",
+                                    "facility_name": "$$poster.facility_name",
+                                    "avatar_url": "$$poster.avatar_url",
+                                    "role": "$$poster.role",
+                                    "is_verified": {"$ifNull": ["$$poster.is_verified", False]}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "$project": {
+                "poster_details": 0
+            }
+        }
+    ]
+    cursor = db["job_listings"].aggregate(pipeline)
     docs = await cursor.to_list(length=limit)
-    return [serialize_doc(d) for d in docs]
+    serialized = [serialize_doc(d) for d in docs]
+    return [s for s in serialized if s is not None]
 
 async def get_job_listings_with_applicant_counts(
     db: AsyncIOMotorDatabase,
@@ -81,7 +173,7 @@ async def get_job_listings_with_applicant_counts(
     page: int = 1,
     limit: int = 10,
 ) -> List[Dict[str, Any]]:
-    """Retrieves list of job listings with dynamic filters, pagination, and total applicant counts using an aggregation pipeline."""
+    """Retrieves list of job listings with dynamic filters, pagination, total applicant counts, and natively populated posted_by details using MongoDB aggregation."""
     match_query: Dict[str, Any] = {}
     if posted_by and ObjectId.is_valid(posted_by):
         match_query["posted_by"] = ObjectId(posted_by)
@@ -113,7 +205,16 @@ async def get_job_listings_with_applicant_counts(
                 "as": "app_count"
             }
         },
-        # Project total_applicants based on subpipeline count
+        # Join with users for posted_by details
+        {
+            "$lookup": {
+                "from": "users",
+                "localField": "posted_by",
+                "foreignField": "_id",
+                "as": "poster_details"
+            }
+        },
+        # Project total_applicants and populated posted_by based on lookups
         {
             "$addFields": {
                 "total_applicants": {
@@ -121,20 +222,41 @@ async def get_job_listings_with_applicant_counts(
                         {"$arrayElemAt": ["$app_count.count", 0]},
                         0
                     ]
+                },
+                "posted_by": {
+                    "$let": {
+                        "vars": {"poster": {"$arrayElemAt": ["$poster_details", 0]}},
+                        "in": {
+                            "$cond": {
+                                "if": {"$not": ["$$poster"]},
+                                "then": "$posted_by",
+                                "else": {
+                                    "_id": "$$poster._id",
+                                    "full_name": "$$poster.full_name",
+                                    "facility_name": "$$poster.facility_name",
+                                    "avatar_url": "$$poster.avatar_url",
+                                    "role": "$$poster.role",
+                                    "is_verified": {"$ifNull": ["$$poster.is_verified", False]}
+                                }
+                            }
+                        }
+                    }
                 }
             }
         },
-        # Project out the app_count field
+        # Project out the temporary aggregation fields
         {
             "$project": {
-                "app_count": 0
+                "app_count": 0,
+                "poster_details": 0
             }
         }
     ]
 
     cursor = db["job_listings"].aggregate(pipeline)
     docs = await cursor.to_list(length=limit)
-    return [serialize_doc(d) for d in docs]
+    serialized = [serialize_doc(d) for d in docs]
+    return [s for s in serialized if s is not None]
 
 async def update_job_listing(db: AsyncIOMotorDatabase, job_id: str, update_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Updates selected fields of a job listing."""
