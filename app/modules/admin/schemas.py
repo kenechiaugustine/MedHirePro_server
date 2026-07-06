@@ -21,3 +21,6 @@ class AdminUserUpdatePayload(BaseModel):
     employment_status: Optional[EmploymentStatus] = Field(None, description="Employment status for candidate")
     current_workplace: Optional[str] = Field(None, description="Current clinical workplace location")
     onboarding_status: Optional[OnboardingStatus] = Field(None, description="User's onboarding status (pending/submitted/approved/rejected)")
+
+class FlagJobPayload(BaseModel):
+    reason: str = Field(..., min_length=5, description="Reason for flagging/taking down the job listing")

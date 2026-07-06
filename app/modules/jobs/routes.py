@@ -3,7 +3,7 @@ from typing import List, Optional
 from bson import ObjectId
 
 from app.core.database import get_database
-from app.core.security import get_current_user_id
+from app.core.security import get_current_user_id, get_current_user_id_optional
 from app.core.utils import verify_user_status
 from app.modules.user import service as user_service
 from app.modules.jobs import service, schemas
@@ -138,14 +138,33 @@ async def list_job_listings(
     job_type: Optional[JobType] = Query(None, description="Filter by PERMANENT or LOCUM"),
     clinical_specialty: Optional[ClinicalSpecialty] = Query(None, description="Filter by medical specialty"),
     clinical_setting: Optional[ClinicalSetting] = Query(None, description="Filter by physical clinical setting"),
-    status: Optional[JobStatus] = Query(JobStatus.OPEN, description="Filter by job status (defaults to OPEN)"),
+    status: Optional[JobStatus] = Query(None, description="Filter by job status (defaults to OPEN for public/others)"),
     page: int = Query(1, ge=1, description="Page number for pagination"),
     limit: int = Query(10, ge=1, le=100, description="Items per page"),
+    current_user_id: Optional[str] = Depends(get_current_user_id_optional),
     db = Depends(get_database)
 ):
     """
     Retrieves all available job listings matching dynamic filter criteria.
     """
+    is_admin = False
+    if current_user_id:
+        user = await user_service.get_user_by_id(db, current_user_id)
+        if user and user.get("role") == "admin":
+            is_admin = True
+
+    if not is_admin:
+        if status == JobStatus.FLAGGED:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to view flagged listings."
+            )
+        exclude_flagged = True
+        if status is None:
+            status = JobStatus.OPEN
+    else:
+        exclude_flagged = False
+
     return await service.get_job_listings(
         db=db,
         job_type=job_type,
@@ -153,7 +172,8 @@ async def list_job_listings(
         clinical_setting=clinical_setting,
         status=status,
         page=page,
-        limit=limit
+        limit=limit,
+        exclude_flagged=exclude_flagged
     )
 
 @router.get(
@@ -198,6 +218,7 @@ async def list_my_job_listings(
 )
 async def read_job_listing(
     job_id: str,
+    current_user_id: Optional[str] = Depends(get_current_user_id_optional),
     db = Depends(get_database)
 ):
     """
@@ -209,6 +230,22 @@ async def read_job_listing(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="Job listing not found"
         )
+        
+    if job.get("status") == JobStatus.FLAGGED:
+        is_authorized = False
+        if current_user_id:
+            user = await user_service.get_user_by_id(db, current_user_id)
+            if user:
+                role = user.get("role")
+                posted_by_id = job["posted_by"].get("_id") if isinstance(job["posted_by"], dict) else job["posted_by"]
+                if role == "admin" or str(posted_by_id) == current_user_id:
+                    is_authorized = True
+        if not is_authorized:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="Job listing not found"
+            )
+            
     return job
 
 @router.put(
@@ -241,7 +278,13 @@ async def modify_job_listing(
             detail="You do not have authorization to edit this job listing."
         )
 
-    updated = await service.update_job_listing(db, job_id, payload.model_dump(exclude_unset=True))
+    update_dict = payload.model_dump(exclude_unset=True)
+    if job.get("status") == JobStatus.FLAGGED and user.get("role") != "admin":
+        update_dict["status"] = update_dict.get("status", JobStatus.OPEN)
+        update_dict["flagged_reason"] = None
+        update_dict["flagged_at"] = None
+
+    updated = await service.update_job_listing(db, job_id, update_dict)
     if not updated:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Update failed.")
     return updated

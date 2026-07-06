@@ -10,7 +10,7 @@ from app.modules.user.enums import UserRole
 from app.modules.credits import schemas as credits_schemas
 from app.modules.credits import enums as credits_enums
 from app.modules.admin import service
-from app.modules.admin.schemas import ReassignJobPayload, AdminUserUpdatePayload
+from app.modules.admin.schemas import ReassignJobPayload, AdminUserUpdatePayload, FlagJobPayload
 from app.modules.jobs.enums import JobType
 from app.modules.user import service as user_service
 
@@ -179,4 +179,32 @@ async def admin_reassign_job_owner(
         )
 
     return {"message": "Job successfully reassigned", "updated_job": updated}
+
+
+@router.put("/jobs/{vacancy_id}/flag", status_code=200)
+async def admin_flag_job(
+    vacancy_id: str,
+    payload: FlagJobPayload,
+    db = Depends(get_database),
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Flags a job post and takes it down, setting status to FLAGGED and storing reason.
+    Only accessible by Administrators.
+    """
+    if not ObjectId.is_valid(vacancy_id):
+        raise HTTPException(status_code=400, detail="Invalid job ID format")
+
+    updated = await service.flag_job_listing(
+        db=db,
+        job_id=vacancy_id,
+        reason=payload.reason
+    )
+    if not updated:
+        raise HTTPException(
+            status_code=404,
+            detail="Target job listing not found."
+        )
+
+    return {"message": "Job successfully flagged and taken down", "updated_job": updated}
 

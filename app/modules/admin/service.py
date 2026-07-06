@@ -161,3 +161,31 @@ async def update_user_details(db: AsyncIOMotorDatabase, user_id: str, update_dat
         
     return await get_user_by_id(db, user_id)
 
+async def flag_job_listing(db: AsyncIOMotorDatabase, job_id: str, reason: str) -> Optional[dict]:
+    """
+    Sets a job listing status to FLAGGED, records the reason and flagging time.
+    """
+    from datetime import datetime, timezone
+    if not ObjectId.is_valid(job_id):
+        return None
+        
+    result = await db["job_listings"].update_one(
+        {"_id": ObjectId(job_id)},
+        {
+            "$set": {
+                "status": "FLAGGED",
+                "flagged_reason": reason,
+                "flagged_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc)
+            }
+        }
+    )
+    if result.matched_count == 0:
+        return None
+        
+    updated = await db["job_listings"].find_one({"_id": ObjectId(job_id)})
+    if updated:
+        from app.modules.jobs.service import serialize_doc
+        return serialize_doc(updated)
+    return None
+

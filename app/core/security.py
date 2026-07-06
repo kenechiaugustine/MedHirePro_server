@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Union, Any
+from typing import Union, Any, Optional
 from jose import jwt, JWTError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials # <--- Import this
@@ -11,6 +11,7 @@ from app.modules.user import service as user_service
 # 1. Change the Security Scheme
 # OLD: oauth2_scheme = OAuth2PasswordBearer(tokenUrl=...)
 security = HTTPBearer() 
+security_optional = HTTPBearer(auto_error=False)
 
 # ... Password functions (verify_password, get_password_hash) remain the same ...
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -75,6 +76,20 @@ async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depend
         return user_id
     except JWTError:
         raise credentials_exception
+
+async def get_current_user_id_optional(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional)) -> Optional[str]:
+    if not credentials:
+        return None
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id = payload.get("sub")
+        token_type = payload.get("type")
+        if user_id is None or token_type != "access":
+            return None
+        return user_id
+    except JWTError:
+        return None
 
 async def get_current_admin(
     user_id: str = Depends(get_current_user_id), 

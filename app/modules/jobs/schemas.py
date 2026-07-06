@@ -138,6 +138,9 @@ class JobListingResponse(BaseModel):
     
     total_applicants: Optional[int] = None
     
+    flagged_reason: Optional[str] = None
+    flagged_at: Optional[datetime] = None
+    
     created_at: datetime
     updated_at: datetime
 

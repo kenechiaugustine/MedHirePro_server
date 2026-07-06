@@ -9,6 +9,7 @@ class JobStatus(str, Enum):
     OPEN = "OPEN"
     FILLED = "FILLED"
     EXPIRED = "EXPIRED"
+    FLAGGED = "FLAGGED"
 
 class RateType(str, Enum):
     HOURLY = "HOURLY"

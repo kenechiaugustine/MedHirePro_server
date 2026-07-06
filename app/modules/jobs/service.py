@@ -101,6 +101,7 @@ async def get_job_listings(
     status: Optional[JobStatus] = None,
     page: int = 1,
     limit: int = 10,
+    exclude_flagged: bool = False,
 ) -> List[Dict[str, Any]]:
     """Retrieves list of job listings with dynamic filters, pagination, and natively populated posted_by details using MongoDB aggregation."""
     query: Dict[str, Any] = {}
@@ -114,6 +115,8 @@ async def get_job_listings(
         query["clinical_setting"] = clinical_setting
     if status is not None:
         query["status"] = status
+    elif exclude_flagged:
+        query["status"] = {"$ne": JobStatus.FLAGGED}
 
     skip = (page - 1) * limit
     pipeline = [
@@ -172,6 +175,7 @@ async def get_job_listings_with_applicant_counts(
     status: Optional[JobStatus] = None,
     page: int = 1,
     limit: int = 10,
+    exclude_flagged: bool = False,
 ) -> List[Dict[str, Any]]:
     """Retrieves list of job listings with dynamic filters, pagination, total applicant counts, and natively populated posted_by details using MongoDB aggregation."""
     match_query: Dict[str, Any] = {}
@@ -185,6 +189,8 @@ async def get_job_listings_with_applicant_counts(
         match_query["clinical_setting"] = clinical_setting
     if status is not None:
         match_query["status"] = status
+    elif exclude_flagged:
+        match_query["status"] = {"$ne": JobStatus.FLAGGED}
 
     skip = (page - 1) * limit
 
@@ -263,7 +269,7 @@ async def update_job_listing(db: AsyncIOMotorDatabase, job_id: str, update_data:
     if not ObjectId.is_valid(job_id):
         return None
     
-    update_fields = {k: v for k, v in update_data.items() if v is not None}
+    update_fields = {k: v for k, v in update_data.items() if v is not None or k in ["flagged_reason", "flagged_at"]}
     if not update_fields:
         return await get_job_listing_by_id(db, job_id)
         
