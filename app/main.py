@@ -15,6 +15,7 @@ from app.modules.admin.routes import router as admin_router
 from app.modules.jobs.routes import router as jobs_router
 
 from app.modules.applications.routes import router as applications_router
+from app.modules.reviews.routes import router as reviews_router
 
 
 
@@ -57,3 +58,4 @@ app.include_router(onboarding_router, prefix=f"{settings.API_V1_STR}/onboarding"
 app.include_router(admin_router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin"])
 app.include_router(jobs_router, prefix=f"{settings.API_V1_STR}/jobs", tags=["Job Listings"])
 app.include_router(applications_router, prefix=f"{settings.API_V1_STR}/applications", tags=["Applications"])
+app.include_router(reviews_router, prefix=f"{settings.API_V1_STR}/reviews", tags=["Reviews"])
