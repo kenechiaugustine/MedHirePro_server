@@ -38,6 +38,12 @@ async def post_permanent_job(
     if not user or not user.get("is_active"):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session.")
 
+    if user.get("banned_from_posting"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account is banned from posting jobs."
+        )
+
     role = user.get("role")
     
     # 1. Enforce verified Institute or Admin
@@ -90,6 +96,12 @@ async def post_locum_job(
     user = await user_service.get_user_by_id(db, user_id)
     if not user or not user.get("is_active"):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session.")
+
+    if user.get("banned_from_posting"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account is banned from posting jobs."
+        )
 
     role = user.get("role")
     
@@ -279,11 +291,6 @@ async def modify_job_listing(
         )
 
     update_dict = payload.model_dump(exclude_unset=True)
-    if job.get("status") == JobStatus.FLAGGED and user.get("role") != "admin":
-        update_dict["status"] = update_dict.get("status", JobStatus.OPEN)
-        update_dict["flagged_reason"] = None
-        update_dict["flagged_at"] = None
-
     updated = await service.update_job_listing(db, job_id, update_dict)
     if not updated:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Update failed.")

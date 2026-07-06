@@ -34,7 +34,12 @@ async def apply_to_job(
     - **Validations**: Checks job existence, status (must be OPEN), and blocks duplicate submittals.
     """
     # 1. Verify candidate is active, verified, and role is professional
-    await verify_user_status(db, user_id, allowed_roles=["professional"])
+    user = await verify_user_status(db, user_id, allowed_roles=["professional"])
+    if user.get("banned_from_applying"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account is banned from applying for jobs."
+        )
 
     # 2. Check if the job exists and is open
     job = await jobs_service.get_job_listing_by_id(db, payload.vacancy_id)

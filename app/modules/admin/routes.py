@@ -208,3 +208,28 @@ async def admin_flag_job(
 
     return {"message": "Job successfully flagged and taken down", "updated_job": updated}
 
+@router.put("/jobs/{vacancy_id}/unflag", status_code=200)
+async def admin_unflag_job(
+    vacancy_id: str,
+    db = Depends(get_database),
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Unflags a job post, clearing status to OPEN and deleting flagged reason/timestamp.
+    Only accessible by Administrators.
+    """
+    if not ObjectId.is_valid(vacancy_id):
+        raise HTTPException(status_code=400, detail="Invalid job ID format")
+
+    updated = await service.unflag_job_listing(
+        db=db,
+        job_id=vacancy_id
+    )
+    if not updated:
+        raise HTTPException(
+            status_code=404,
+            detail="Target job listing not found or not in flagged state."
+        )
+
+    return {"message": "Job successfully unflagged and restored to OPEN", "updated_job": updated}
+

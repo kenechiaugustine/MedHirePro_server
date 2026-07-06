@@ -22,6 +22,8 @@ def _format_user(user: dict) -> dict:
     user["onboarding_status"] = user.get("onboarding_status") if user.get("onboarding_status") is not None else "pending"
     user["is_verified"] = user.get("is_verified") if user.get("is_verified") is not None else False
     user["referred_count"] = user.get("referred_count") if user.get("referred_count") is not None else 0
+    user["banned_from_posting"] = user.get("banned_from_posting") if user.get("banned_from_posting") is not None else False
+    user["banned_from_applying"] = user.get("banned_from_applying") if user.get("banned_from_applying") is not None else False
     return user
 
 async def get_all_users(
@@ -176,6 +178,34 @@ async def flag_job_listing(db: AsyncIOMotorDatabase, job_id: str, reason: str) -
                 "status": "FLAGGED",
                 "flagged_reason": reason,
                 "flagged_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc)
+            }
+        }
+    )
+    if result.matched_count == 0:
+        return None
+        
+    updated = await db["job_listings"].find_one({"_id": ObjectId(job_id)})
+    if updated:
+        from app.modules.jobs.service import serialize_doc
+        return serialize_doc(updated)
+    return None
+
+async def unflag_job_listing(db: AsyncIOMotorDatabase, job_id: str) -> Optional[dict]:
+    """
+    Restores a flagged job listing status to OPEN, and clears flagging reason and timestamp.
+    """
+    from datetime import datetime, timezone
+    if not ObjectId.is_valid(job_id):
+        return None
+        
+    result = await db["job_listings"].update_one(
+        {"_id": ObjectId(job_id)},
+        {
+            "$set": {
+                "status": "OPEN",
+                "flagged_reason": None,
+                "flagged_at": None,
                 "updated_at": datetime.now(timezone.utc)
             }
         }

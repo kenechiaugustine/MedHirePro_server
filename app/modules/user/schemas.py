@@ -53,6 +53,8 @@ class UserResponse(UserBase):
     daily_credit_cap: int = 20
     is_active: bool
     is_deleted: bool = False
+    banned_from_posting: bool = False
+    banned_from_applying: bool = False
     onboarding_status: str = "pending"
     is_verified: bool = False
     employment_status: Optional[str] = None
