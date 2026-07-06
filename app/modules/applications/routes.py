@@ -1,3 +1,4 @@
+from fastapi import logger
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Body
 from typing import List, Optional
 from bson import ObjectId
@@ -298,7 +299,10 @@ async def shortlist_application(
     if not posted_by:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Targeted job listing no longer exists.")
 
-    if posted_by != user_id and user.get("role") != "admin":
+    # log the posted_by id and user id for debugging
+    print(f"Posted by: {posted_by.get('_id')}, User ID: {user_id}")
+    
+    if str(posted_by.get('_id')) != str(user_id) and user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the posting facility or an administrator can shortlist candidates."
@@ -348,7 +352,9 @@ async def accept_application(
     if not posted_by:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Targeted job listing no longer exists.")
 
-    if posted_by != user_id and user.get("role") != "admin":
+    # log the posted_by id and user id for debugging
+    print(f"Posted by: {posted_by.get('_id')}, User ID: {user_id}")
+    if str(posted_by.get('_id')) != str(user_id) and user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the posting facility or an administrator can accept candidates."
@@ -366,7 +372,7 @@ async def accept_application(
 )
 async def update_status_directly(
     application_id: str,
-    status_payload: ApplicationStatus = Body(..., embed=True, description="Target status"),
+    application_status: ApplicationStatus = Body(..., embed=True, description="Target status"),
     user_id: str = Depends(get_current_user_id),
     db = Depends(get_database)
 ):
@@ -397,13 +403,16 @@ async def update_status_directly(
     if not posted_by:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Targeted job listing no longer exists.")
 
-    if posted_by != user_id and user.get("role") != "admin":
+    # log the posted_by id and user id for debugging
+    print(f"Posted by: {posted_by.get('_id')}, User ID: {user_id}")
+
+    if str(posted_by.get('_id')) != str(user_id) and user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the posting facility or an administrator can update application statuses."
         )
 
-    updated = await service.update_application_status(db, application_id, status_payload)
+    updated = await service.update_application_status(db, application_id, application_status)
     if not updated:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Operation failed.")
     return updated
