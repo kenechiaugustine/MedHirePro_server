@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+import os
 from app.core.database import get_database
 from app.core.security import get_current_user_id
 from app.modules.media import service
@@ -10,6 +11,7 @@ router = APIRouter()
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
 async def upload_media(
     file: UploadFile = File(..., description="Select a file to upload"),
+    upload_type: str = Form("document", description="Type of upload (picture or document)"),
     user_id: str = Depends(get_current_user_id),
     db = Depends(get_database)
 ):
@@ -21,6 +23,28 @@ async def upload_media(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No file provided for upload"
+        )
+
+    filename = file.filename.lower()
+    allowed_picture_exts = {".jpg", ".jpeg", ".png"}
+    allowed_document_exts = {".pdf", ".docx", ".jpg", ".jpeg", ".png"}
+
+    if upload_type == "picture":
+        if not any(filename.endswith(ext) for ext in allowed_picture_exts):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid file format. Only JPG and PNG are accepted for pictures."
+            )
+    elif upload_type == "document":
+        if not any(filename.endswith(ext) for ext in allowed_document_exts):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid file format. Only PDF, DOCX, JPG, and PNG are accepted for documents."
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid upload type specified."
         )
         
     asset = await service.upload_media_file(db, user_id, file)
