@@ -44,11 +44,32 @@ async def create_job_listing(db: AsyncIOMotorDatabase, posted_by: str, job_data:
     return serialized
 
 async def get_job_listing_by_id(db: AsyncIOMotorDatabase, job_id: str) -> Optional[Dict[str, Any]]:
-    """Retrieves a single job listing by ID with natively populated posted_by details using MongoDB aggregation."""
+    """Retrieves a single job listing by ID with natively populated posted_by details and total_applicants using MongoDB aggregation."""
     if not ObjectId.is_valid(job_id):
         return None
     pipeline = [
         {"$match": {"_id": ObjectId(job_id)}},
+        {
+            "$lookup": {
+                "from": "applications",
+                "let": {"job_id": "$_id"},
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$or": [
+                                    {"$eq": ["$vacancy_id", "$$job_id"]},
+                                    {"$eq": ["$vacancy_id", {"$toString": "$$job_id"}]},
+                                    {"$eq": [{"$toString": "$vacancy_id"}, {"$toString": "$$job_id"}]}
+                                ]
+                            }
+                        }
+                    },
+                    {"$count": "count"}
+                ],
+                "as": "app_count"
+            }
+        },
         {
             "$lookup": {
                 "from": "users",
@@ -59,6 +80,12 @@ async def get_job_listing_by_id(db: AsyncIOMotorDatabase, job_id: str) -> Option
         },
         {
             "$addFields": {
+                "total_applicants": {
+                    "$ifNull": [
+                        {"$arrayElemAt": ["$app_count.count", 0]},
+                        0
+                    ]
+                },
                 "posted_by": {
                     "$let": {
                         "vars": {"poster": {"$arrayElemAt": ["$poster_details", 0]}},
@@ -82,6 +109,7 @@ async def get_job_listing_by_id(db: AsyncIOMotorDatabase, job_id: str) -> Option
         },
         {
             "$project": {
+                "app_count": 0,
                 "poster_details": 0
             }
         }
@@ -103,68 +131,18 @@ async def get_job_listings(
     limit: int = 10,
     exclude_flagged: bool = False,
 ) -> List[Dict[str, Any]]:
-    """Retrieves list of job listings with dynamic filters, pagination, and natively populated posted_by details using MongoDB aggregation."""
-    query: Dict[str, Any] = {}
-    if posted_by and ObjectId.is_valid(posted_by):
-        query["posted_by"] = ObjectId(posted_by)
-    if job_type is not None:
-        query["job_type"] = job_type
-    if clinical_specialty is not None:
-        query["clinical_specialty"] = clinical_specialty
-    if clinical_setting is not None:
-        query["clinical_setting"] = clinical_setting
-    if status is not None:
-        query["status"] = status
-    elif exclude_flagged:
-        query["status"] = {"$ne": JobStatus.FLAGGED}
-
-    skip = (page - 1) * limit
-    pipeline = [
-        {"$match": query},
-        {"$sort": {"created_at": -1}},
-        {"$skip": skip},
-        {"$limit": limit},
-        {
-            "$lookup": {
-                "from": "users",
-                "localField": "posted_by",
-                "foreignField": "_id",
-                "as": "poster_details"
-            }
-        },
-        {
-            "$addFields": {
-                "posted_by": {
-                    "$let": {
-                        "vars": {"poster": {"$arrayElemAt": ["$poster_details", 0]}},
-                        "in": {
-                            "$cond": {
-                                "if": {"$not": ["$$poster"]},
-                                "then": "$posted_by",
-                                "else": {
-                                    "_id": "$$poster._id",
-                                    "full_name": "$$poster.full_name",
-                                    "facility_name": "$$poster.facility_name",
-                                    "avatar_url": "$$poster.avatar_url",
-                                    "role": "$$poster.role",
-                                    "is_verified": {"$ifNull": ["$$poster.is_verified", False]}
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        {
-            "$project": {
-                "poster_details": 0
-            }
-        }
-    ]
-    cursor = db["job_listings"].aggregate(pipeline)
-    docs = await cursor.to_list(length=limit)
-    serialized = [serialize_doc(d) for d in docs]
-    return [s for s in serialized if s is not None]
+    """Retrieves list of job listings with dynamic filters, pagination, total applicant counts, and natively populated posted_by details using MongoDB aggregation."""
+    return await get_job_listings_with_applicant_counts(
+        db=db,
+        posted_by=posted_by,
+        job_type=job_type,
+        clinical_specialty=clinical_specialty,
+        clinical_setting=clinical_setting,
+        status=status,
+        page=page,
+        limit=limit,
+        exclude_flagged=exclude_flagged
+    )
 
 async def get_job_listings_with_applicant_counts(
     db: AsyncIOMotorDatabase,
@@ -205,7 +183,17 @@ async def get_job_listings_with_applicant_counts(
                 "from": "applications",
                 "let": {"job_id": "$_id"},
                 "pipeline": [
-                    {"$match": {"$expr": {"$eq": ["$vacancy_id", "$$job_id"]}}},
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$or": [
+                                    {"$eq": ["$vacancy_id", "$$job_id"]},
+                                    {"$eq": ["$vacancy_id", {"$toString": "$$job_id"}]},
+                                    {"$eq": [{"$toString": "$vacancy_id"}, {"$toString": "$$job_id"}]}
+                                ]
+                            }
+                        }
+                    },
                     {"$count": "count"}
                 ],
                 "as": "app_count"

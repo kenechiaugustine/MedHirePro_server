@@ -59,14 +59,35 @@ async def apply_to_job(
             detail="You have already submitted an application for this job listing."
         )
 
-    # 4. Create the application
+    # 4. Job type application requirements validation
+    job_type = job.get("job_type")
+    cv_url = payload.curriculum_vitae_url or ""
+    credential_urls = payload.credentialing_packet_urls or []
+
+    if job_type == JobType.PERMANENT:
+        if not cv_url.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Curriculum Vitae (CV) is mandatory when applying for permanent roles."
+            )
+        if not credential_urls or len(credential_urls) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="At least one supporting document is mandatory when applying for permanent roles."
+            )
+    elif job_type == JobType.LOCUM:
+        # Locum applications only require clinical cover note
+        cv_url = ""
+        credential_urls = []
+
+    # 5. Create the application
     app_dict = ApplicationModel.new_application(
         candidate_id=user_id,
         vacancy_id=payload.vacancy_id,
-        vacancy_type=job.get("job_type"),
-        curriculum_vitae_url=payload.curriculum_vitae_url,
+        vacancy_type=job_type,
+        curriculum_vitae_url=cv_url,
         clinical_summary=payload.clinical_summary,
-        credentialing_packet_urls=payload.credentialing_packet_urls,
+        credentialing_packet_urls=credential_urls,
     )
 
     return await service.create_application(db, user_id, app_dict)

@@ -7,7 +7,7 @@ from app.modules.applications.enums import ApplicationStatus
 
 class ApplicationCreate(BaseModel):
     vacancy_id: str = Field(..., description="MongoDB ObjectId of the targeted unified job listing")
-    curriculum_vitae_url: str = Field(..., description="Secure Cloudinary / Media URL of the candidate's CV")
+    curriculum_vitae_url: Optional[str] = Field(None, description="Secure Cloudinary / Media URL of the candidate's CV")
     clinical_summary: str = Field(..., min_length=10, description="Cover letter / professional summary explaining clinical capabilities")
     credentialing_packet_urls: Optional[List[str]] = Field(default_factory=list, description="Other supporting documents (licenses, certificates)")
 
@@ -21,6 +21,7 @@ class CandidateDetails(BaseModel):
     id: str
     full_name: Optional[str] = None
     email: Optional[str] = None
+    phone_number: Optional[str] = None
     specialty: Optional[str] = None
     avatar_url: Optional[str] = None
     is_verified: bool = False
@@ -40,7 +41,7 @@ class ApplicationResponse(BaseModel):
     candidate_details: Optional[CandidateDetails] = None
     vacancy_id: Union[JobListingResponse, str]
     vacancy_type: JobType
-    curriculum_vitae_url: str
+    curriculum_vitae_url: Optional[str] = ""
     clinical_summary: str
     credentialing_packet_urls: List[str]
     is_shortlisted: bool

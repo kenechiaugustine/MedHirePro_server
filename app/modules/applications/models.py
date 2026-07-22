@@ -13,15 +13,15 @@ class ApplicationModel:
         candidate_id: str,
         vacancy_id: str,                        # References unified Job Listing
         vacancy_type: JobType,                  # PERMANENT or LOCUM
-        curriculum_vitae_url: str,
         clinical_summary: str,
+        curriculum_vitae_url: Optional[str] = "",
         credentialing_packet_urls: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         return {
             "candidate_id": candidate_id,
             "vacancy_id": vacancy_id,
             "vacancy_type": vacancy_type,
-            "curriculum_vitae_url": curriculum_vitae_url,       # CV / Resume URL
+            "curriculum_vitae_url": curriculum_vitae_url or "",       # CV / Resume URL
             "clinical_summary": clinical_summary,               # Cover letter / Professional profile
             "credentialing_packet_urls": credentialing_packet_urls or [], # Supporting documents
             "is_shortlisted": False,

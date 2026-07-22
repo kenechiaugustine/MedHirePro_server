@@ -15,6 +15,7 @@ class UserModel:
         avatar_url: Optional[str] = None,
         employment_status: Optional[str] = None,
         current_workplace: Optional[str] = None,
+        phone_number: Optional[str] = None,
         referral_code: Optional[str] = None,
         referred_by: Optional[str] = None,
     ) -> dict:
@@ -22,6 +23,7 @@ class UserModel:
             "email": email,
             "password_hash": password_hash,     # Nullable for Google users
             "full_name": full_name,
+            "phone_number": phone_number,
             "specialty": specialty,             # For professionals
             "facility_name": facility_name,     # For institutes
             "google_id": google_id,             # Nullable for Email/Pass users

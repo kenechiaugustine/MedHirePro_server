@@ -61,13 +61,17 @@ async def submit_onboarding(db: AsyncIOMotorDatabase, user_id: str, role: str, d
         res = await db["onboarding_submissions"].insert_one(submission_doc)
         submission_doc["_id"] = str(res.inserted_id)
         
-    # 3. Update User Onboarding status
+    # 3. Update User Onboarding status & phone_number
+    user_status_update = {
+        "onboarding_status": OnboardingStatus.PENDING.value,
+        "updated_at": datetime.now(timezone.utc)
+    }
+    if details.get("phone_number"):
+        user_status_update["phone_number"] = details.get("phone_number")
+
     await db["users"].update_one(
         {"_id": ObjectId(user_id)},
-        {"$set": {
-            "onboarding_status": OnboardingStatus.PENDING.value,
-            "updated_at": datetime.now(timezone.utc)
-        }}
+        {"$set": user_status_update}
     )
     
     submission_doc["user_id"] = str(submission_doc["user_id"])
@@ -176,6 +180,8 @@ async def review_onboarding(
             "is_verified": True,
             "updated_at": now
         }
+        if details.get("phone_number"):
+            user_updates["phone_number"] = details["phone_number"]
         
         # Sync submission specific profile fields
         if role == "professional":

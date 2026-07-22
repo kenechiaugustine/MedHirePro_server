@@ -3,6 +3,7 @@ from typing import Optional
 from datetime import datetime
 
 class ProfessionalOnboardingSubmit(BaseModel):
+    phone_number: Optional[str] = Field(None, description="Contact phone number of the professional user")
     is_intern: bool = Field(default=False, description="True if the professional is an intern or student without a license")
     licence_number: Optional[str] = Field(None, description="Active medical license registration number")
     licence_expiry: Optional[str] = Field(None, description="License expiration date (YYYY-MM-DD)")
@@ -33,6 +34,7 @@ class FacilityAddress(BaseModel):
 
 
 class InstituteOnboardingSubmit(BaseModel):
+    phone_number: Optional[str] = Field(None, description="Contact phone number of the facility representative")
     business_registration_number: str = Field(..., description="Corporate identity, EIN or Tax Registration Number")
     facility_type: str = Field(..., description="Type of facility (e.g., Hospital, Clinic, Diagnostic Center, Pharmacy)")
     business_license_url: str = Field(..., description="Secure URL to uploaded business operating license / permit")

@@ -35,6 +35,7 @@ class UserUpdateCredits(BaseModel):
 # Profile Update Payload
 class UserUpdateProfile(BaseModel):
     full_name: Optional[str] = None
+    phone_number: Optional[str] = None
     specialty: Optional[str] = None
     facility_name: Optional[str] = None
     avatar_url: Optional[str] = None
@@ -45,6 +46,7 @@ class UserUpdateProfile(BaseModel):
 class UserResponse(UserBase):
     id: str = Field(alias="_id")
     full_name: Optional[str] = None
+    phone_number: Optional[str] = None
     specialty: Optional[str] = None
     facility_name: Optional[str] = None
     avatar_url: Optional[str] = None
