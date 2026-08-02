@@ -50,7 +50,7 @@ async def submit_review(
 )
 async def list_reviews(
     page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=1, le=100),
+    limit: int = Query(10, ge=1, le=50000),
     current_admin: dict = Depends(get_current_admin),
     db = Depends(get_database)
 ):

@@ -152,7 +152,7 @@ async def list_job_listings(
     clinical_setting: Optional[ClinicalSetting] = Query(None, description="Filter by physical clinical setting"),
     status: Optional[JobStatus] = Query(None, description="Filter by job status (defaults to OPEN for public/others)"),
     page: int = Query(1, ge=1, description="Page number for pagination"),
-    limit: int = Query(10, ge=1, le=100, description="Items per page"),
+    limit: int = Query(10, ge=1, le=50000, description="Items per page"),
     current_user_id: Optional[str] = Depends(get_current_user_id_optional),
     db = Depends(get_database)
 ):
@@ -199,7 +199,7 @@ async def list_my_job_listings(
     clinical_setting: Optional[ClinicalSetting] = Query(None, description="Filter by physical clinical setting"),
     status: Optional[JobStatus] = Query(None, description="Filter by status"),
     page: int = Query(1, ge=1, description="Page number for pagination"),
-    limit: int = Query(10, ge=1, le=100, description="Items per page"),
+    limit: int = Query(10, ge=1, le=50000, description="Items per page"),
     user_id: str = Depends(get_current_user_id),
     db = Depends(get_database)
 ):

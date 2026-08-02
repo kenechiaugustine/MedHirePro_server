@@ -43,7 +43,7 @@ async def spend_credits(
 @router.get("/history", response_model=List[schemas.CreditTransactionResponse])
 async def get_history(
     page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=1, le=10000),
+    limit: int = Query(10, ge=1, le=50000),
     date: Optional[date] = Query(None, description="Filter by date (YYYY-MM-DD)"),
     user_id: str = Depends(get_current_user_id),
     type: Optional[enums.CreditType] = Query(None),

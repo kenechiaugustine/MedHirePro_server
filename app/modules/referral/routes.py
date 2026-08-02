@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
 from bson import ObjectId
 from app.core.database import get_database
@@ -45,12 +45,15 @@ async def get_referral_details(
 
 @router.get("/users", response_model=List[user_schemas.UserResponse])
 async def get_referred_users(
+    page: int = Query(1, ge=1, description="Page number for pagination"),
+    limit: int = Query(10, ge=1, le=50000, description="Number of items per page"),
     user_id: str = Depends(get_current_user_id),
     db = Depends(get_database)
 ):
-    # Retrieve all users referred by this user
-    cursor = db["users"].find({"referred_by": ObjectId(user_id)})
-    referred_users = await cursor.to_list(length=None)
+    # Retrieve users referred by this user with pagination
+    skip = (page - 1) * limit
+    cursor = db["users"].find({"referred_by": ObjectId(user_id)}).skip(skip).limit(limit).sort("created_at", -1)
+    referred_users = await cursor.to_list(length=limit)
     
     # Format the users properly
     for u in referred_users:
@@ -59,3 +62,4 @@ async def get_referred_users(
             u["referred_by"] = str(u["referred_by"])
             
     return referred_users
+

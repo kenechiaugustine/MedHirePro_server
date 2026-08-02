@@ -20,7 +20,7 @@ router = APIRouter()
 @router.get("/users", response_model=List[user_schemas.UserResponse])
 async def read_all_users(
     page: int = Query(1, ge=1, description="Page number for pagination"),
-    limit: int = Query(10, ge=1, le=100, description="Number of items per page"),
+    limit: int = Query(10, ge=1, le=50000, description="Number of items per page"),
     role: Optional[UserRole] = Query(None, description="Filter by user role"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     search: Optional[str] = Query(None, description="Search by name, email, or facility"),
@@ -44,7 +44,7 @@ async def read_all_users(
 async def read_user_credits_history(
     user_id: str,
     page: int = Query(1, ge=1, description="Page number for pagination"),
-    limit: int = Query(10, ge=1, le=100, description="Number of items per page"),
+    limit: int = Query(10, ge=1, le=50000, description="Number of items per page"),
     date: Optional[date] = Query(None, description="Filter by date (YYYY-MM-DD)"),
     type: Optional[credits_enums.CreditType] = Query(None, description="Filter by transaction type (earn/spend)"),
     source: Optional[credits_enums.CreditSource] = Query(None, description="Filter by credit source"),
@@ -74,7 +74,7 @@ async def read_user_credits_history(
 async def read_user_referrals(
     user_id: str,
     page: int = Query(1, ge=1, description="Page number for pagination"),
-    limit: int = Query(10, ge=1, le=100, description="Number of items per page"),
+    limit: int = Query(10, ge=1, le=50000, description="Number of items per page"),
     db = Depends(get_database),
     current_admin: dict = Depends(get_current_admin)
 ):

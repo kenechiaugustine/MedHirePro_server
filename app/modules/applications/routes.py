@@ -105,7 +105,7 @@ async def list_applications(
     is_accepted: Optional[bool] = Query(None, description="Filter by acceptance status"),
     application_status: Optional[ApplicationStatus] = Query(None, description="Filter by application pipeline status"),
     page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(10, ge=1, le=100, description="Items per page"),
+    limit: int = Query(10, ge=1, le=50000, description="Items per page"),
     user_id: str = Depends(get_current_user_id),
     db = Depends(get_database)
 ):
@@ -188,7 +188,7 @@ async def list_my_applications(
     is_accepted: Optional[bool] = Query(None, description="Filter by acceptance status"),
     application_status: Optional[ApplicationStatus] = Query(None, description="Filter by application pipeline status"),
     page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(10, ge=1, le=100, description="Items per page"),
+    limit: int = Query(10, ge=1, le=50000, description="Items per page"),
     user_id: str = Depends(get_current_user_id),
     db = Depends(get_database)
 ):

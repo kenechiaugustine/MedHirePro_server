@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Body, status
+from fastapi import APIRouter, Depends, HTTPException, Body, status, Query
 from pydantic import ValidationError
 from app.core.database import get_database
 from app.core.security import get_current_user_id, get_current_admin
@@ -93,8 +93,9 @@ async def get_my_onboarding_status(
 
 @router.get("/admin/pending")
 async def get_pending_onboardings(
-    skip: int = 0,
-    limit: int = 10,
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(10, ge=1, le=50000, description="Items per page"),
+    skip: int = Query(0, ge=0, description="Items to skip"),
     admin = Depends(get_current_admin),
     db = Depends(get_database)
 ):
@@ -102,7 +103,8 @@ async def get_pending_onboardings(
     Admin-only endpoint to list onboarding submissions that are currently pending verification.
     Submissions are sorted in FIFO order.
     """
-    submissions = await service.list_pending_submissions(db, skip, limit)
+    effective_skip = skip if skip > 0 else (page - 1) * limit
+    submissions = await service.list_pending_submissions(db, effective_skip, limit)
     return {
         "count": len(submissions),
         "submissions": submissions
