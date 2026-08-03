@@ -1,7 +1,7 @@
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from bson import ObjectId
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any, List, Optional
 from fastapi import HTTPException
 from app.modules.credits.models import CreditTransactionModel
 from app.modules.credits.enums import CreditType, CreditSource
@@ -121,8 +121,7 @@ async def process_transaction(
 
 # --- 3. Get History ---
 # --- User Function ---
-async def get_user_history(db: AsyncIOMotorDatabase, user_id: str, page: int, limit: int, date_filter: Optional[str] = None, type: Optional[CreditType] = None, source: Optional[CreditSource] = None):
-    skip = (page - 1) * limit
+async def get_user_history(db: AsyncIOMotorDatabase, user_id: str, page: int, limit: int, date_filter: Optional[str] = None, type: Optional[CreditType] = None, source: Optional[CreditSource] = None) -> tuple[List[dict], int]:
     query: dict[str, Any] = {"user_id": ObjectId(user_id)}
 
     # add filter by type and source
@@ -141,12 +140,14 @@ async def get_user_history(db: AsyncIOMotorDatabase, user_id: str, page: int, li
         except ValueError:
             pass # Ignore invalid date formats
 
+    total_count = await db["credit_transactions"].count_documents(query)
+    skip = (page - 1) * limit
     cursor = db["credit_transactions"].find(query).sort("created_at", -1).skip(skip).limit(limit)
     
     history = await cursor.to_list(length=limit)
     for h in history:
         h["_id"] = str(h["_id"])
-    return history
+    return history, total_count
 
 # --- Admin History ---
 async def get_all_transactions_by_user(
@@ -157,9 +158,9 @@ async def get_all_transactions_by_user(
     date_filter: Optional[str] = None, 
     type: Optional[CreditType] = None, 
     source: Optional[CreditSource] = None
-):
+) -> tuple[List[dict], int]:
     if not ObjectId.is_valid(user_id):
-        return []
+        return [], 0
     
     query: dict[str, Any] = {"user_id": ObjectId(user_id)}
 
@@ -178,13 +179,14 @@ async def get_all_transactions_by_user(
         except ValueError:
             pass
 
+    total_count = await db["credit_transactions"].count_documents(query)
     skip = (page - 1) * limit
     cursor = db["credit_transactions"].find(query).sort("created_at", -1).skip(skip).limit(limit)
     
     history = await cursor.to_list(length=limit)
     for h in history:
         h["_id"] = str(h["_id"])
-    return history
+    return history, total_count
 
 async def delete_transaction(db: AsyncIOMotorDatabase, tx_id: str):
     """

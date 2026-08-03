@@ -33,7 +33,7 @@ async def get_all_users(
     role: Optional[UserRole] = None,
     is_active: Optional[bool] = None,
     search: Optional[str] = None
-) -> List[dict]:
+) -> tuple[List[dict], int]:
     """
     Fetch all users with filtering, search, and pagination.
     """
@@ -53,11 +53,12 @@ async def get_all_users(
             {"facility_name": {"$regex": search, "$options": "i"}}
         ]
         
+    total_count = await db["users"].count_documents(query)
     skip = (page - 1) * limit
     cursor = db["users"].find(query).skip(skip).limit(limit).sort("created_at", -1)
     users = await cursor.to_list(length=limit)
     
-    return [_format_user(u) for u in users]
+    return [_format_user(u) for u in users], total_count
 
 async def get_user_credits_history(
     db: AsyncIOMotorDatabase,
@@ -67,7 +68,7 @@ async def get_user_credits_history(
     date_filter: Optional[str] = None,
     type: Optional[CreditType] = None,
     source: Optional[CreditSource] = None
-) -> List[dict]:
+) -> tuple[List[dict], int]:
     """
     Fetch credits transaction history for a specific user.
     """
@@ -86,18 +87,20 @@ async def get_user_referrals(
     user_id: str,
     page: int = 1,
     limit: int = 10
-) -> List[dict]:
+) -> tuple[List[dict], int]:
     """
     Fetch all users referred by a specific user.
     """
     if not ObjectId.is_valid(user_id):
-        return []
+        return [], 0
         
+    query = {"referred_by": ObjectId(user_id)}
+    total_count = await db["users"].count_documents(query)
     skip = (page - 1) * limit
-    cursor = db["users"].find({"referred_by": ObjectId(user_id)}).skip(skip).limit(limit).sort("created_at", -1)
+    cursor = db["users"].find(query).skip(skip).limit(limit).sort("created_at", -1)
     referred_users = await cursor.to_list(length=limit)
     
-    return [_format_user(u) for u in referred_users]
+    return [_format_user(u) for u in referred_users], total_count
 
 async def reassign_job_owner(
     db: AsyncIOMotorDatabase,

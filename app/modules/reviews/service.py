@@ -13,7 +13,8 @@ async def get_all_reviews(
     db: AsyncIOMotorDatabase, 
     page: int = 1, 
     limit: int = 10
-) -> List[dict]:
+) -> tuple[List[dict], int]:
+    total_count = await db["reviews"].count_documents({})
     skip = (page - 1) * limit
     cursor = db["reviews"].find().sort("created_at", -1).skip(skip).limit(limit)
     reviews = []
@@ -25,7 +26,7 @@ async def get_all_reviews(
         if user_doc:
             doc["user_details"] = user_doc
         reviews.append(doc)
-    return reviews
+    return reviews, total_count
 
 async def update_review_visibility(
     db: AsyncIOMotorDatabase, 

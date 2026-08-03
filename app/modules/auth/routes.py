@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.database import get_database
 from app.core.security import create_access_token, create_refresh_token, validate_refresh_token, get_password_hash, get_current_user_id
+from app.core.response import SingleResponse, create_single_response
 from app.modules.user import schemas as user_schemas
 from app.modules.auth import schemas as auth_schemas
 from app.modules.auth import service as auth_service
@@ -14,7 +15,7 @@ from bson import ObjectId
 
 router = APIRouter()
 
-@router.post("/register/professional", response_model=auth_schemas.TokenResponse)
+@router.post("/register/professional", response_model=SingleResponse[auth_schemas.TokenResponse])
 async def register_professional(
     payload: user_schemas.ProfessionalRegister,
     db = Depends(get_database)
@@ -66,15 +67,15 @@ async def register_professional(
             pass
 
     user_id = str(user["_id"])
-    return {
+    return create_single_response({
         "access_token": create_access_token(user_id),
         "refresh_token": create_refresh_token(user_id),
         "token_type": "bearer",
         "user_role": UserRole.PROFESSIONAL
-    }
+    })
 
 
-@router.post("/register/institute", response_model=auth_schemas.TokenResponse)
+@router.post("/register/institute", response_model=SingleResponse[auth_schemas.TokenResponse])
 async def register_institute(
     payload: user_schemas.InstituteRegister,
     db = Depends(get_database)
@@ -123,15 +124,15 @@ async def register_institute(
             pass
 
     user_id = str(user["_id"])
-    return {
+    return create_single_response({
         "access_token": create_access_token(user_id),
         "refresh_token": create_refresh_token(user_id),
         "token_type": "bearer",
         "user_role": UserRole.INSTITUTE
-    }
+    })
 
 
-@router.post("/authenticate-with-google", response_model=auth_schemas.TokenResponse)
+@router.post("/authenticate-with-google", response_model=SingleResponse[auth_schemas.TokenResponse])
 async def authenticate_google(
     payload: auth_schemas.GoogleLoginRequest,
     db = Depends(get_database)
@@ -192,14 +193,14 @@ async def authenticate_google(
             )
 
     user_id = str(user["_id"])
-    return {
+    return create_single_response({
         "access_token": create_access_token(user_id),
         "refresh_token": create_refresh_token(user_id),
         "token_type": "bearer",
         "user_role": user.get("role", UserRole.PROFESSIONAL)
-    }
+    })
 
-@router.post("/login", response_model=auth_schemas.TokenResponse)
+@router.post("/login", response_model=SingleResponse[auth_schemas.TokenResponse])
 async def login(
     payload: user_schemas.UserLogin,
     db = Depends(get_database)
@@ -213,14 +214,14 @@ async def login(
         )
     
     user_id = str(user["_id"])
-    return {
+    return create_single_response({
         "access_token": create_access_token(user_id),
         "refresh_token": create_refresh_token(user_id),
         "token_type": "bearer",
         "user_role": user.get("role", UserRole.PROFESSIONAL)
-    }
+    })
 
-@router.post("/change-password")
+@router.post("/change-password", response_model=SingleResponse[dict])
 async def change_password(
     payload: auth_schemas.ChangePasswordRequest,
     user_id: str = Depends(get_current_user_id),
@@ -232,9 +233,9 @@ async def change_password(
     if not success:
         raise HTTPException(status_code=400, detail=message)
     
-    return {"message": message}
+    return create_single_response({"message": message})
 
-@router.post("/admin/login", response_model=auth_schemas.TokenResponse)
+@router.post("/admin/login", response_model=SingleResponse[auth_schemas.TokenResponse])
 async def admin_login(
     payload: user_schemas.UserLogin,
     db = Depends(get_database)
@@ -255,14 +256,14 @@ async def admin_login(
         )
     
     user_id = str(user["_id"])
-    return {
+    return create_single_response({
         "access_token": create_access_token(user_id),
         "refresh_token": create_refresh_token(user_id),
         "token_type": "bearer",
         "user_role": UserRole.ADMIN
-    }
+    })
 
-@router.post("/refresh-token", response_model=auth_schemas.TokenResponse)
+@router.post("/refresh-token", response_model=SingleResponse[auth_schemas.TokenResponse])
 async def refresh_token(
     refresh_token: str,
     db = Depends(get_database)
@@ -279,15 +280,15 @@ async def refresh_token(
     new_access_token = create_access_token(user_id)
     new_refresh_token = create_refresh_token(user_id)
 
-    return {
+    return create_single_response({
         "access_token": new_access_token,
         "refresh_token": new_refresh_token,
         "token_type": "bearer",
         "user_role": user.get("role", UserRole.PROFESSIONAL)
-    }
+    })
 
 
-@router.post("/seed-admin", status_code=status.HTTP_201_CREATED)
+@router.post("/seed-admin", status_code=status.HTTP_201_CREATED, response_model=SingleResponse[dict])
 async def seed_admin(
     db = Depends(get_database)
 ):
@@ -323,7 +324,7 @@ async def seed_admin(
     # Insert into database
     user = await user_service.create_user(db, new_user_data)
     
-    return {
+    return create_single_response({
         "message": "Admin account seeded successfully",
         "user": {
             "id": str(user["_id"]),
@@ -332,4 +333,4 @@ async def seed_admin(
             "onboarding_status": user["onboarding_status"],
             "is_verified": user["is_verified"]
         }
-    }
+    })

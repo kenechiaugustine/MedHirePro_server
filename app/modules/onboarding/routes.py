@@ -2,13 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, Body, status, Query
 from pydantic import ValidationError
 from app.core.database import get_database
 from app.core.security import get_current_user_id, get_current_admin
+from app.core.response import PaginatedResponse, SingleResponse, create_paginated_response, create_single_response
 from app.modules.user import service as user_service
 from app.modules.onboarding import service, schemas
 
 router = APIRouter()
 
 
-@router.post("/submit", status_code=status.HTTP_200_OK)
+@router.post("/submit", status_code=status.HTTP_200_OK, response_model=SingleResponse[dict])
 async def submit_onboarding_form(
     payload: dict = Body(..., example={
         "is_intern": False,
@@ -62,13 +63,13 @@ async def submit_onboarding_form(
         )
         
     submission = await service.submit_onboarding(db, user_id, role, validated_details)
-    return {
+    return create_single_response({
         "message": "Onboarding credentials submitted successfully for review",
         "submission": submission
-    }
+    })
 
 
-@router.get("/status")
+@router.get("/status", response_model=SingleResponse[dict])
 async def get_my_onboarding_status(
     user_id: str = Depends(get_current_user_id),
     db = Depends(get_database)
@@ -84,14 +85,14 @@ async def get_my_onboarding_status(
         )
         
     submission = await service.get_onboarding_status(db, user_id)
-    return {
+    return create_single_response({
         "onboarding_status": user.get("onboarding_status", "not_started"),
         "is_verified": user.get("is_verified", False),
         "submission": submission
-    }
+    })
 
 
-@router.get("/admin/pending")
+@router.get("/admin/pending", response_model=PaginatedResponse[dict])
 async def get_pending_onboardings(
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(10, ge=1, le=50000, description="Items per page"),
@@ -104,14 +105,11 @@ async def get_pending_onboardings(
     Submissions are sorted in FIFO order.
     """
     effective_skip = skip if skip > 0 else (page - 1) * limit
-    submissions = await service.list_pending_submissions(db, effective_skip, limit)
-    return {
-        "count": len(submissions),
-        "submissions": submissions
-    }
+    submissions, total_count = await service.list_pending_submissions(db, effective_skip, limit)
+    return create_paginated_response(submissions, page, limit, total_count)
 
 
-@router.post("/admin/review")
+@router.post("/admin/review", response_model=SingleResponse[dict])
 async def review_onboarding_submission(
     payload: schemas.AdminReviewPayload,
     admin = Depends(get_current_admin),
@@ -130,7 +128,7 @@ async def review_onboarding_submission(
         payload.action,
         payload.rejection_reason
     )
-    return {
+    return create_single_response({
         "message": f"Onboarding submission has been successfully {payload.action}ed",
         "submission": submission
-    }
+    })

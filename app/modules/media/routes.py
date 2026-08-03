@@ -2,13 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, s
 import os
 from app.core.database import get_database
 from app.core.security import get_current_user_id
+from app.core.response import SingleResponse, create_single_response
 from app.modules.media import service
 from app.modules.user import service as user_service
 
 router = APIRouter()
 
 
-@router.post("/upload", status_code=status.HTTP_201_CREATED)
+@router.post("/upload", status_code=status.HTTP_201_CREATED, response_model=SingleResponse[dict])
 async def upload_media(
     file: UploadFile = File(..., description="Select a file to upload"),
     upload_type: str = Form("document", description="Type of upload (picture or document)"),
@@ -49,13 +50,13 @@ async def upload_media(
         
     asset = await service.upload_media_file(db, user_id, file)
     
-    return {
+    return create_single_response({
         "message": "Successfully uploaded file",
         "media": asset
-    }
+    })
 
 
-@router.get("/{media_id}")
+@router.get("/{media_id}", response_model=SingleResponse[dict])
 async def get_media_info(
     media_id: str,
     user_id: str = Depends(get_current_user_id),
@@ -70,10 +71,10 @@ async def get_media_info(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Media resource not found"
         )
-    return media
+    return create_single_response(media)
 
 
-@router.delete("/{media_id}")
+@router.delete("/{media_id}", response_model=SingleResponse[dict])
 async def delete_media(
     media_id: str,
     user_id: str = Depends(get_current_user_id),
@@ -96,4 +97,4 @@ async def delete_media(
             detail="Media resource not found"
         )
         
-    return {"message": "Media resource deleted successfully"}
+    return create_single_response({"message": "Media resource deleted successfully"})

@@ -5,6 +5,7 @@ from bson import ObjectId
 from app.core.database import get_database
 from app.core.security import get_current_user_id, get_current_user_id_optional
 from app.core.utils import verify_user_status
+from app.core.response import PaginatedResponse, SingleResponse, create_paginated_response, create_single_response
 from app.modules.user import service as user_service
 from app.modules.jobs import service, schemas
 from app.modules.jobs.enums import (
@@ -20,7 +21,7 @@ router = APIRouter()
 
 @router.post(
     "/permanent", 
-    response_model=schemas.JobListingResponse, 
+    response_model=SingleResponse[schemas.JobListingResponse], 
     status_code=status.HTTP_201_CREATED,
     summary="Post a permanent job listing"
 )
@@ -75,11 +76,12 @@ async def post_permanent_job(
         fringe_benefits=payload.fringe_benefits,
     )
     
-    return await service.create_job_listing(db, user_id, job_dict)
+    created = await service.create_job_listing(db, user_id, job_dict)
+    return create_single_response(created)
 
 @router.post(
     "/locum", 
-    response_model=schemas.JobListingResponse, 
+    response_model=SingleResponse[schemas.JobListingResponse], 
     status_code=status.HTTP_201_CREATED,
     summary="Post a locum shift vacancy"
 )
@@ -139,11 +141,12 @@ async def post_locum_job(
         on_call_requirements=payload.on_call_requirements,
     )
     
-    return await service.create_job_listing(db, user_id, job_dict)
+    created = await service.create_job_listing(db, user_id, job_dict)
+    return create_single_response(created)
 
 @router.get(
     "", 
-    response_model=List[schemas.JobListingResponse],
+    response_model=PaginatedResponse[schemas.JobListingResponse],
     summary="Query job listings"
 )
 async def list_job_listings(
@@ -177,7 +180,7 @@ async def list_job_listings(
     else:
         exclude_flagged = False
 
-    return await service.get_job_listings(
+    jobs, total_count = await service.get_job_listings(
         db=db,
         job_type=job_type,
         clinical_specialty=clinical_specialty,
@@ -187,10 +190,11 @@ async def list_job_listings(
         limit=limit,
         exclude_flagged=exclude_flagged
     )
+    return create_paginated_response(jobs, page, limit, total_count)
 
 @router.get(
     "/my-listings", 
-    response_model=List[schemas.JobListingResponse],
+    response_model=PaginatedResponse[schemas.JobListingResponse],
     summary="Query job listings posted by the current user"
 )
 async def list_my_job_listings(
@@ -210,7 +214,7 @@ async def list_my_job_listings(
     if not user or not user.get("is_active"):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session.")
 
-    listings = await service.get_job_listings_with_applicant_counts(
+    listings, total_count = await service.get_job_listings_with_applicant_counts(
         db=db,
         posted_by=user_id,
         job_type=job_type,
@@ -221,11 +225,11 @@ async def list_my_job_listings(
         limit=limit
     )
 
-    return listings
+    return create_paginated_response(listings, page, limit, total_count)
 
 @router.get(
     "/{job_id}", 
-    response_model=schemas.JobListingResponse,
+    response_model=SingleResponse[schemas.JobListingResponse],
     summary="Get job listing details"
 )
 async def read_job_listing(
@@ -258,11 +262,11 @@ async def read_job_listing(
                 detail="Job listing not found"
             )
             
-    return job
+    return create_single_response(job)
 
 @router.put(
     "/{job_id}", 
-    response_model=schemas.JobListingResponse,
+    response_model=SingleResponse[schemas.JobListingResponse],
     summary="Update job listing"
 )
 async def modify_job_listing(
@@ -294,7 +298,7 @@ async def modify_job_listing(
     updated = await service.update_job_listing(db, job_id, update_dict)
     if not updated:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Update failed.")
-    return updated
+    return create_single_response(updated)
 
 @router.delete(
     "/{job_id}", 

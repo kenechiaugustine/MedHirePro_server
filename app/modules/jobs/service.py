@@ -130,7 +130,7 @@ async def get_job_listings(
     page: int = 1,
     limit: int = 10,
     exclude_flagged: bool = False,
-) -> List[Dict[str, Any]]:
+) -> tuple[List[Dict[str, Any]], int]:
     """Retrieves list of job listings with dynamic filters, pagination, total applicant counts, and natively populated posted_by details using MongoDB aggregation."""
     return await get_job_listings_with_applicant_counts(
         db=db,
@@ -154,7 +154,7 @@ async def get_job_listings_with_applicant_counts(
     page: int = 1,
     limit: int = 10,
     exclude_flagged: bool = False,
-) -> List[Dict[str, Any]]:
+) -> tuple[List[Dict[str, Any]], int]:
     """Retrieves list of job listings with dynamic filters, pagination, total applicant counts, and natively populated posted_by details using MongoDB aggregation."""
     match_query: Dict[str, Any] = {}
     if posted_by and ObjectId.is_valid(posted_by):
@@ -170,6 +170,7 @@ async def get_job_listings_with_applicant_counts(
     elif exclude_flagged:
         match_query["status"] = {"$ne": JobStatus.FLAGGED}
 
+    total_count = await db["job_listings"].count_documents(match_query)
     skip = (page - 1) * limit
 
     pipeline = [
@@ -250,7 +251,7 @@ async def get_job_listings_with_applicant_counts(
     cursor = db["job_listings"].aggregate(pipeline)
     docs = await cursor.to_list(length=limit)
     serialized = [serialize_doc(d) for d in docs]
-    return [s for s in serialized if s is not None]
+    return [s for s in serialized if s is not None], total_count
 
 async def update_job_listing(db: AsyncIOMotorDatabase, job_id: str, update_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Updates selected fields of a job listing."""

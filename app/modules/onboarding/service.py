@@ -94,12 +94,14 @@ async def get_onboarding_status(db: AsyncIOMotorDatabase, user_id: str) -> Optio
     return sub
 
 
-async def list_pending_submissions(db: AsyncIOMotorDatabase, skip: int = 0, limit: int = 10) -> List[dict]:
+async def list_pending_submissions(db: AsyncIOMotorDatabase, skip: int = 0, limit: int = 10) -> tuple[List[dict], int]:
     """
     Lists all onboarding submissions that are currently pending review (status = 'submitted').
     Enriches with user metadata.
     """
-    cursor = db["onboarding_submissions"].find({"status": OnboardingStatus.PENDING.value})
+    query = {"status": OnboardingStatus.PENDING.value}
+    total_count = await db["onboarding_submissions"].count_documents(query)
+    cursor = db["onboarding_submissions"].find(query)
     # FIFO order: earliest submissions first
     cursor = cursor.sort("submitted_at", 1).skip(skip).limit(limit)
     
@@ -124,7 +126,7 @@ async def list_pending_submissions(db: AsyncIOMotorDatabase, skip: int = 0, limi
             
         res_list.append(sub)
         
-    return res_list
+    return res_list, total_count
 
 
 async def review_onboarding(

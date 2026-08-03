@@ -6,6 +6,7 @@ from bson import ObjectId
 from app.core.database import get_database
 from app.core.security import get_current_user_id
 from app.core.utils import verify_user_status
+from app.core.response import PaginatedResponse, SingleResponse, create_paginated_response, create_single_response
 from app.modules.user import service as user_service
 from app.modules.applications import service, schemas
 from app.modules.applications.enums import ApplicationStatus
@@ -19,7 +20,7 @@ router = APIRouter()
 
 @router.post(
     "", 
-    response_model=schemas.ApplicationResponse, 
+    response_model=SingleResponse[schemas.ApplicationResponse], 
     status_code=status.HTTP_201_CREATED,
     summary="Apply for a job listing"
 )
@@ -90,11 +91,12 @@ async def apply_to_job(
         credentialing_packet_urls=credential_urls,
     )
 
-    return await service.create_application(db, user_id, app_dict)
+    created = await service.create_application(db, user_id, app_dict)
+    return create_single_response(created)
 
 @router.get(
     "", 
-    response_model=List[schemas.ApplicationResponse],
+    response_model=PaginatedResponse[schemas.ApplicationResponse],
     summary="Query applications"
 )
 async def list_applications(
@@ -126,10 +128,10 @@ async def list_applications(
     if role != "admin":
         if vacancy_id:
             if not ObjectId.is_valid(vacancy_id):
-                return []
+                return create_paginated_response([], page, limit, 0)
             job = await jobs_service.get_job_listing_by_id(db, vacancy_id)
             if not job:
-                return []
+                return create_paginated_response([], page, limit, 0)
             posted_by_id = job["posted_by"].get("_id") if isinstance(job["posted_by"], dict) else job["posted_by"]
             if posted_by_id != user_id:
                 raise HTTPException(
@@ -141,7 +143,7 @@ async def list_applications(
             jobs = await db["job_listings"].find({"posted_by": ObjectId(user_id)}).to_list(length=1000)
             allowed_ids = [ObjectId(j["_id"]) for j in jobs]
             if not allowed_ids:
-                return []
+                return create_paginated_response([], page, limit, 0)
             
             query_filter: dict = {}
             if is_shortlisted is not None:
@@ -156,15 +158,17 @@ async def list_applications(
             query_filter["vacancy_id"] = {"$in": allowed_ids}
             if candidate_id:
                 if not ObjectId.is_valid(candidate_id):
-                    return []
+                    return create_paginated_response([], page, limit, 0)
                 query_filter["candidate_id"] = ObjectId(candidate_id)
             
+            total_count = await db["applications"].count_documents(query_filter)
             skip = (page - 1) * limit
             cursor = db["applications"].find(query_filter).sort("created_at", -1).skip(skip).limit(limit)
             docs = await cursor.to_list(length=limit)
-            return [await service.populate_application_vacancy(db, d) for d in docs]
+            items = [await service.populate_application_vacancy(db, d) for d in docs]
+            return create_paginated_response(items, page, limit, total_count)
 
-    return await service.get_applications(
+    apps, total_count = await service.get_applications(
         db=db,
         candidate_id=candidate_id,
         vacancy_id=vacancy_id,
@@ -175,10 +179,11 @@ async def list_applications(
         page=page,
         limit=limit
     )
+    return create_paginated_response(apps, page, limit, total_count)
 
 @router.get(
     "/my-applications", 
-    response_model=List[schemas.ApplicationResponse],
+    response_model=PaginatedResponse[schemas.ApplicationResponse],
     summary="Query applications submitted by the current user"
 )
 async def list_my_applications(
@@ -205,7 +210,7 @@ async def list_my_applications(
             detail="Only candidates with the professional role or administrators can view application logs."
         )
 
-    return await service.get_applications(
+    apps, total_count = await service.get_applications(
         db=db,
         candidate_id=user_id,
         vacancy_id=vacancy_id,
@@ -216,10 +221,11 @@ async def list_my_applications(
         page=page,
         limit=limit
     )
+    return create_paginated_response(apps, page, limit, total_count)
 
 @router.get(
     "/check-applied", 
-    response_model=dict,
+    response_model=SingleResponse[dict],
     summary="Check if user has already applied for a job listing"
 )
 async def check_user_has_applied(
@@ -233,12 +239,12 @@ async def check_user_has_applied(
     """
     application = await service.get_user_application_for_vacancy(db, user_id, vacancy_id)
     if application:
-        return {"applied": True, "application": application}
-    return {"applied": False, "application": None}
+        return create_single_response({"applied": True, "application": application})
+    return create_single_response({"applied": False, "application": None})
 
 @router.get(
     "/{application_id}", 
-    response_model=schemas.ApplicationResponse,
+    response_model=SingleResponse[schemas.ApplicationResponse],
     summary="Get application details"
 )
 async def read_application(
@@ -284,11 +290,11 @@ async def read_application(
     if not (is_owner or is_candidate or is_admin):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
 
-    return application
+    return create_single_response(application)
 
 @router.put(
     "/{application_id}/shortlist", 
-    response_model=schemas.ApplicationResponse,
+    response_model=SingleResponse[schemas.ApplicationResponse],
     summary="Shortlist an applicant"
 )
 async def shortlist_application(
@@ -325,9 +331,6 @@ async def shortlist_application(
     if not posted_by:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Targeted job listing no longer exists.")
 
-    # log the posted_by id and user id for debugging
-    print(f"Posted by: {posted_by.get('_id')}, User ID: {user_id}")
-    
     if str(posted_by.get('_id')) != str(user_id) and user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -337,11 +340,11 @@ async def shortlist_application(
     updated = await service.update_application_shortlist(db, application_id, payload.is_shortlisted)
     if not updated:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Operation failed.")
-    return updated
+    return create_single_response(updated)
 
 @router.put(
     "/{application_id}/accept", 
-    response_model=schemas.ApplicationResponse,
+    response_model=SingleResponse[schemas.ApplicationResponse],
     summary="Accept an applicant"
 )
 async def accept_application(
@@ -378,8 +381,6 @@ async def accept_application(
     if not posted_by:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Targeted job listing no longer exists.")
 
-    # log the posted_by id and user id for debugging
-    print(f"Posted by: {posted_by.get('_id')}, User ID: {user_id}")
     if str(posted_by.get('_id')) != str(user_id) and user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -389,11 +390,11 @@ async def accept_application(
     updated = await service.update_application_acceptance(db, application_id, payload.is_accepted)
     if not updated:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Operation failed.")
-    return updated
+    return create_single_response(updated)
 
 @router.put(
     "/{application_id}/status", 
-    response_model=schemas.ApplicationResponse,
+    response_model=SingleResponse[schemas.ApplicationResponse],
     summary="Update application status directly"
 )
 async def update_status_directly(
@@ -429,9 +430,6 @@ async def update_status_directly(
     if not posted_by:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Targeted job listing no longer exists.")
 
-    # log the posted_by id and user id for debugging
-    print(f"Posted by: {posted_by.get('_id')}, User ID: {user_id}")
-
     if str(posted_by.get('_id')) != str(user_id) and user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -441,4 +439,4 @@ async def update_status_directly(
     updated = await service.update_application_status(db, application_id, application_status)
     if not updated:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Operation failed.")
-    return updated
+    return create_single_response(updated)

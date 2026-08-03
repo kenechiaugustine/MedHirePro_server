@@ -3,6 +3,7 @@ from typing import List
 from bson import ObjectId
 from app.core.database import get_database
 from app.core.security import get_current_user_id, get_current_admin
+from app.core.response import PaginatedResponse, SingleResponse, create_paginated_response, create_single_response
 from app.modules.reviews import service, schemas
 from app.modules.reviews.models import ReviewModel
 from app.modules.user import service as user_service
@@ -11,7 +12,7 @@ router = APIRouter()
 
 @router.post(
     "", 
-    response_model=schemas.ReviewResponse, 
+    response_model=SingleResponse[schemas.ReviewResponse], 
     status_code=status.HTTP_201_CREATED,
     summary="Submit platform review/feedback"
 )
@@ -41,11 +42,11 @@ async def submit_review(
     
     # Attach user details to response
     created["user_details"] = user
-    return created
+    return create_single_response(created)
 
 @router.get(
     "", 
-    response_model=List[schemas.ReviewResponse],
+    response_model=PaginatedResponse[schemas.ReviewResponse],
     summary="Retrieve reviews (Admin only)"
 )
 async def list_reviews(
@@ -58,11 +59,12 @@ async def list_reviews(
     Retrieves all reviews/feedback submitted by platform users.
     Only accessible by administrators.
     """
-    return await service.get_all_reviews(db, page=page, limit=limit)
+    reviews, total_count = await service.get_all_reviews(db, page=page, limit=limit)
+    return create_paginated_response(reviews, page, limit, total_count)
 
 @router.put(
     "/{review_id}/visibility",
-    response_model=schemas.ReviewResponse,
+    response_model=SingleResponse[schemas.ReviewResponse],
     summary="Update review visibility (Admin only)"
 )
 async def update_review_visibility(
@@ -82,4 +84,4 @@ async def update_review_visibility(
     if not updated:
         raise HTTPException(status_code=404, detail="Review not found")
         
-    return updated
+    return create_single_response(updated)

@@ -124,16 +124,16 @@ async def get_applications(
     application_status: Optional[ApplicationStatus] = None,
     page: int = 1,
     limit: int = 10,
-) -> List[Dict[str, Any]]:
+) -> tuple[List[Dict[str, Any]], int]:
     """Queries applications dynamically with pagination and natively populates vacancy details using an aggregation pipeline."""
     query: Dict[str, Any] = {}
     if candidate_id:
         if not ObjectId.is_valid(candidate_id):
-            return []
+            return [], 0
         query["candidate_id"] = ObjectId(candidate_id)
     if vacancy_id:
         if not ObjectId.is_valid(vacancy_id):
-            return []
+            return [], 0
         query["vacancy_id"] = ObjectId(vacancy_id)
     if vacancy_type is not None:
         query["vacancy_type"] = vacancy_type
@@ -144,6 +144,7 @@ async def get_applications(
     if application_status is not None:
         query["application_status"] = application_status
 
+    total_count = await db["applications"].count_documents(query)
     skip = (page - 1) * limit
 
     pipeline = [
@@ -260,7 +261,7 @@ async def get_applications(
     cursor = db["applications"].aggregate(pipeline)
     docs = await cursor.to_list(length=limit)
     serialized = [serialize_doc(d) for d in docs]
-    return [s for s in serialized if s is not None]
+    return [s for s in serialized if s is not None], total_count
 
 async def has_user_applied(db: AsyncIOMotorDatabase, candidate_id: str, vacancy_id: str) -> bool:
     """Checks if a candidate has already applied to a particular vacancy."""

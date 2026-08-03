@@ -1,16 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import List, Optional
+from datetime import date
 from app.core.database import get_database
 from app.core.security import get_current_user_id
+from app.core.response import PaginatedResponse, SingleResponse, create_paginated_response, create_single_response
 from app.modules.credits import schemas, service, enums
-from fastapi import Query
-from datetime import date
-from typing import Optional
 
 router = APIRouter()
 
 # 1. Earn Credits (Protected)
-@router.post("/earn")
+@router.post("/earn", response_model=SingleResponse[schemas.CreditTransactionResponse])
 async def earn_credits(
     payload: schemas.EarnCreditRequest,
     user_id: str = Depends(get_current_user_id),
@@ -24,23 +23,25 @@ async def earn_credits(
     await service.check_earning_eligibility(db, user_id, payload.source, payload.amount)
 
     # 2. Process
-    return await service.process_transaction(
+    res = await service.process_transaction(
         db, user_id, payload.amount, enums.CreditType.EARN, payload.source
     )
+    return create_single_response(res)
 
 # 2. Spend Credits (Protected)
-@router.post("/spend")
+@router.post("/spend", response_model=SingleResponse[schemas.CreditTransactionResponse])
 async def spend_credits(
     payload: schemas.SpendCreditRequest,
     user_id: str = Depends(get_current_user_id),
     db = Depends(get_database)
 ):
-    return await service.process_transaction(
+    res = await service.process_transaction(
         db, user_id, payload.amount, enums.CreditType.SPEND, payload.source, payload.description
     )
+    return create_single_response(res)
 
 # 3. Get History
-@router.get("/history", response_model=List[schemas.CreditTransactionResponse])
+@router.get("/history", response_model=PaginatedResponse[schemas.CreditTransactionResponse])
 async def get_history(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=50000),
@@ -52,10 +53,11 @@ async def get_history(
 ):
     # Convert date object to string if present
     date_str = str(date) if date else None
-    return await service.get_user_history(db, user_id, page, limit, date_str, type, source)
+    history, total_count = await service.get_user_history(db, user_id, page, limit, date_str, type, source)
+    return create_paginated_response(history, page, limit, total_count)
 
 
-@router.get("/eligibility", response_model=schemas.EarningEligibilityResponse)
+@router.get("/eligibility", response_model=SingleResponse[schemas.EarningEligibilityResponse])
 async def check_eligibility(
     source: enums.CreditSource, # Query param
     user_id: str = Depends(get_current_user_id),
@@ -64,4 +66,4 @@ async def check_eligibility(
     status = await service.get_earning_status(db, user_id, source)
     if not status:
         raise HTTPException(status_code=404, detail="User not found")
-    return status
+    return create_single_response(status)

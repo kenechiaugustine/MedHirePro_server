@@ -5,6 +5,7 @@ from bson import ObjectId
 
 from app.core.database import get_database
 from app.core.security import get_current_admin
+from app.core.response import PaginatedResponse, SingleResponse, create_paginated_response, create_single_response
 from app.modules.user import schemas as user_schemas
 from app.modules.user.enums import UserRole
 from app.modules.credits import schemas as credits_schemas
@@ -17,7 +18,7 @@ from app.modules.user import service as user_service
 router = APIRouter()
 
 
-@router.get("/users", response_model=List[user_schemas.UserResponse])
+@router.get("/users", response_model=PaginatedResponse[user_schemas.UserResponse])
 async def read_all_users(
     page: int = Query(1, ge=1, description="Page number for pagination"),
     limit: int = Query(10, ge=1, le=50000, description="Number of items per page"),
@@ -31,7 +32,7 @@ async def read_all_users(
     Fetch all users with optional filtering, search, and pagination.
     Only accessible by administrators.
     """
-    return await service.get_all_users(
+    users, total_count = await service.get_all_users(
         db=db,
         page=page,
         limit=limit,
@@ -39,8 +40,9 @@ async def read_all_users(
         is_active=is_active,
         search=search
     )
+    return create_paginated_response(users, page, limit, total_count)
 
-@router.get("/users/{user_id}/credits", response_model=List[credits_schemas.CreditTransactionResponse])
+@router.get("/users/{user_id}/credits", response_model=PaginatedResponse[credits_schemas.CreditTransactionResponse])
 async def read_user_credits_history(
     user_id: str,
     page: int = Query(1, ge=1, description="Page number for pagination"),
@@ -60,7 +62,7 @@ async def read_user_credits_history(
         
     date_str = str(date) if date else None
     
-    return await service.get_user_credits_history(
+    txs, total_count = await service.get_user_credits_history(
         db=db,
         user_id=user_id,
         page=page,
@@ -69,8 +71,9 @@ async def read_user_credits_history(
         type=type,
         source=source
     )
+    return create_paginated_response(txs, page, limit, total_count)
 
-@router.get("/users/{user_id}/referrals", response_model=List[user_schemas.UserResponse])
+@router.get("/users/{user_id}/referrals", response_model=PaginatedResponse[user_schemas.UserResponse])
 async def read_user_referrals(
     user_id: str,
     page: int = Query(1, ge=1, description="Page number for pagination"),
@@ -85,15 +88,16 @@ async def read_user_referrals(
     if not ObjectId.is_valid(user_id):
         raise HTTPException(status_code=400, detail="Invalid user ID format")
         
-    return await service.get_user_referrals(
+    referred_users, total_count = await service.get_user_referrals(
         db=db,
         user_id=user_id,
         page=page,
         limit=limit
     )
+    return create_paginated_response(referred_users, page, limit, total_count)
 
 
-@router.get("/users/{user_id}", response_model=user_schemas.UserResponse)
+@router.get("/users/{user_id}", response_model=SingleResponse[user_schemas.UserResponse])
 async def read_user_by_id(
     user_id: str,
     db = Depends(get_database),
@@ -106,10 +110,10 @@ async def read_user_by_id(
     user = await service.get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User profile not found")
-    return user
+    return create_single_response(user)
 
 
-@router.put("/users/{user_id}", response_model=user_schemas.UserResponse)
+@router.put("/users/{user_id}", response_model=SingleResponse[user_schemas.UserResponse])
 async def admin_update_user_details(
     user_id: str,
     payload: AdminUserUpdatePayload,
@@ -123,7 +127,7 @@ async def admin_update_user_details(
     updated = await service.update_user_details(db, user_id, payload.model_dump())
     if not updated:
         raise HTTPException(status_code=404, detail="User profile not found or failed to update")
-    return updated
+    return create_single_response(updated)
 
 
 @router.put("/jobs/{vacancy_id}/reassign", status_code=200)
@@ -178,7 +182,7 @@ async def admin_reassign_job_owner(
             detail="Target job listing not found in the collection."
         )
 
-    return {"message": "Job successfully reassigned", "updated_job": updated}
+    return create_single_response({"message": "Job successfully reassigned", "updated_job": updated})
 
 
 @router.put("/jobs/{vacancy_id}/flag", status_code=200)
@@ -206,7 +210,7 @@ async def admin_flag_job(
             detail="Target job listing not found."
         )
 
-    return {"message": "Job successfully flagged and taken down", "updated_job": updated}
+    return create_single_response({"message": "Job successfully flagged and taken down", "updated_job": updated})
 
 @router.put("/jobs/{vacancy_id}/unflag", status_code=200)
 async def admin_unflag_job(
@@ -231,5 +235,5 @@ async def admin_unflag_job(
             detail="Target job listing not found or not in flagged state."
         )
 
-    return {"message": "Job successfully unflagged and restored to OPEN", "updated_job": updated}
+    return create_single_response({"message": "Job successfully unflagged and restored to OPEN", "updated_job": updated})
 
